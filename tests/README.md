@@ -1,0 +1,11 @@
+# Checklist uji integrasi
+- Import registry: kolom wajib, duplikasi, upsert.
+- Google Drive: service account dapat membaca dan mengunduh PDF.
+- PDF digital: ekstraksi teks berhasil.
+- PDF scan: OCR berjalan jika diaktifkan.
+- Chunking: ukuran, overlap, metadata halaman.
+- Embedding: jumlah vektor sama dengan jumlah chunk dan dimensi cocok.
+- Upload: checksum sukses hanya aktif setelah seluruh chunk tersimpan.
+- Retrieval: hanya chunk dari dokumen completed/checksum aktif.
+- Assistant: pertanyaan umum, pertanyaan yang perlu RAG, sumber, dan konteks tidak memadai.
+- Error: status failed dicatat; versi sukses sebelumnya tetap bisa dipakai.
