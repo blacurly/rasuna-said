@@ -1,14 +1,18 @@
+# Environment variables & secrets
 .env
 .env.*
-!.env.local
 *.json.key
 *service-account*.json
 credentials*.json
+
+# Python cache & virtual environments
 __pycache__/
 *.py[cod]
 .venv/
 venv/
 .ipynb_checkpoints/
+
+# Processed data & large/binary files
 data/processed/*
 !data/processed/.gitkeep
 *.pdf
