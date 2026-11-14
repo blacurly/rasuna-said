@@ -1,0 +1,17 @@
+
+# Automatically detect text files
+* text=auto
+
+# Use LF for source code and configuration files
+*.py text eol=lf
+*.txt text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.sql text eol=lf
+*.csv text eol=lf
+
+# Keep Windows scripts in CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
