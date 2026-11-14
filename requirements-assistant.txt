@@ -13,3 +13,7 @@ Pillow>=10.4
 gdown>=5.2
 requests>=2.32
 ipython>=8.0
+
+# API layanan embedding
+fastapi>=0.115
+uvicorn[standard]>=0.30
