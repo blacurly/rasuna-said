@@ -1,0 +1,80 @@
+
+name: AIRA Ingestion
+
+on:
+  workflow_dispatch:
+    inputs:
+      force_reprocess:
+        description: "Proses ulang semua dokumen, termasuk yang sudah completed"
+        type: boolean
+        required: false
+        default: false
+
+      maks_dokumen:
+        description: "Batas jumlah dokumen (kosongkan untuk semua)"
+        type: string
+        required: false
+        default: ""
+
+  schedule:
+    # Setiap hari pukul 02.00 WIB (19.00 UTC)
+    - cron: "0 19 * * *"
+
+concurrency:
+  group: aira-ingestion
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    defaults:
+      run:
+        working-directory: pipeline
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pipeline/requirements.txt
+
+      - name: Cache embedding model
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: hf-${{ hashFiles('pipeline/requirements.txt') }}-mpnet
+
+      - name: Install Tesseract OCR
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq \
+            tesseract-ocr \
+            tesseract-ocr-ind \
+            tesseract-ocr-eng
+
+      - name: Install PyTorch CPU
+        run: |
+          pip install torch \
+            --index-url https://download.pytorch.org/whl/cpu
+
+      - name: Install Python dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Run ingestion
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          FORCE_REPROCESS: ${{ github.event.inputs.force_reprocess || 'false' }}
+          MAKS_DOKUMEN: ${{ github.event.inputs.maks_dokumen || '' }}
+        run: |
+          python ingest.py

@@ -8,7 +8,12 @@ import {
 } from "react";
 
 import { INITIAL_MESSAGE } from "@/components/assistant/assistant.constants";
-import { kirimPesanAssistant } from "@/app/actions/assistant";
+import {
+  kirimPesanAssistant,
+} from "@/app/actions/assistant";
+import {
+  ambilRiwayatAssistant,
+} from "@/app/actions/riwayat";
 
 export function useAssistantChat() {
   const [messages, setMessages] = useState([
@@ -19,10 +24,63 @@ export function useAssistantChat() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [retryMessage, setRetryMessage] = useState("");
+  const [historyLoading, setHistoryLoading] = useState(true);
 
   const endRef = useRef(null);
+  const historyLoadedRef = useRef(false);
 
-  // Menggeser tampilan ke pesan terbaru.
+  useEffect(() => {
+    let active = true;
+
+    async function loadHistory() {
+      try {
+        const response = await ambilRiwayatAssistant();
+
+        if (!active || !response?.ok) return;
+
+        const restoredMessages = [];
+
+        for (const item of response.data || []) {
+          restoredMessages.push({
+            id: `user-${item.interaction_id}`,
+            role: "user",
+            content: item.user_question,
+          });
+
+          restoredMessages.push({
+            id: `assistant-${item.interaction_id}`,
+            role: "assistant",
+            content: item.assistant_response,
+          });
+        }
+
+        if (restoredMessages.length > 0) {
+          setMessages([
+            INITIAL_MESSAGE,
+            ...restoredMessages,
+          ]);
+        }
+
+        historyLoadedRef.current = true;
+      } catch (err) {
+        console.error(
+          "[AIRA Assistant] Gagal memuat riwayat:",
+          err
+        );
+      } finally {
+        if (active) {
+          setHistoryLoading(false);
+        }
+      }
+    }
+
+    loadHistory();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
   useEffect(() => {
     endRef.current?.scrollIntoView({
       behavior: "smooth",
@@ -37,14 +95,13 @@ export function useAssistantChat() {
           ? question.trim()
           : "";
 
-      if (!message || loading) return;
+      if (!message || loading || historyLoading) return;
 
       const isRetry = options.retry === true;
 
       setError("");
       setRetryMessage(message);
 
-      // Pesan pengguna hanya ditambahkan sekali.
       if (!isRetry) {
         setMessages((previous) => [
           ...previous,
@@ -60,8 +117,6 @@ export function useAssistantChat() {
       setLoading(true);
 
       try {
-        // Riwayat diambil dari pesan sebelum permintaan terbaru.
-        // Pesan awal sambutan tidak perlu dikirim ke backend.
         const history = messages
           .filter(
             (item) =>
@@ -75,8 +130,6 @@ export function useAssistantChat() {
             content: item.content,
           }));
 
-        // Ketika retry, pertanyaan yang gagal sudah ada di riwayat.
-        // Hapus dari history agar tidak terkirim dua kali.
         if (
           history.length > 0 &&
           history[history.length - 1].role === "user" &&
@@ -125,7 +178,7 @@ export function useAssistantChat() {
         setLoading(false);
       }
     },
-    [input, loading, messages]
+    [input, loading, messages, historyLoading]
   );
 
   const retryMessageSend = useCallback(() => {
@@ -140,10 +193,11 @@ export function useAssistantChat() {
     messages,
     input,
     setInput,
-    loading,
+    loading: loading || historyLoading,
     error,
     endRef,
     sendMessage,
     retryMessageSend,
+    historyLoading,
   };
 }

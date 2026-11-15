@@ -1,4 +1,3 @@
-
 // Curah hujan rata-rata per wilayah (mm/bulan).
 // DATA SIMULASI untuk prototipe, bukan data resmi.
 // Nama wilayah menggunakan nama kabupaten/kota sebagai acuan.
@@ -18,8 +17,8 @@ export const WILAYAH_CURAH_HUJAN = [
   { nama: "Indramayu, Jawa Barat", curahHujanMm: 110, lat: -6.33, lng: 108.32 },
 ];
 
-// Menyamakan penulisan nama kabupaten/kota dari Supabase
-// dengan nama acuan pada data curah hujan simulasi.
+// Normalisasi nama wilayah agar perbedaan penulisan
+// Kabupaten, Kota, spasi, dan kapitalisasi tidak mengganggu pencarian.
 function normalisasiNamaWilayah(nama) {
   return nama
     .trim()
@@ -30,8 +29,10 @@ function normalisasiNamaWilayah(nama) {
 
 // Mengembalikan curah hujan (mm/bulan).
 // Mendukung format:
-// 1. Kabupaten, Provinsi
-// 2. Kecamatan, Kabupaten/Kota, Provinsi
+// 1. Gunungkidul
+// 2. Gunungkidul, DI Yogyakarta
+// 3. Kecamatan, Gunungkidul, DI Yogyakarta
+// 4. Desa, Kecamatan, Gunungkidul, DI Yogyakarta
 export function cariCurahHujan(namaWilayah) {
   if (!namaWilayah || typeof namaWilayah !== "string") {
     return null;
@@ -39,24 +40,16 @@ export function cariCurahHujan(namaWilayah) {
 
   const bagian = namaWilayah
     .split(",")
-    .map((item) => item.trim());
+    .map((item) => item.trim())
+    .filter(Boolean);
 
-  let namaKabupaten;
-
-  if (bagian.length === 3) {
-    namaKabupaten = bagian[1];
-  } else if (bagian.length === 2) {
-    namaKabupaten = bagian[0];
-  } else {
-    return null;
-  }
-
-  const namaNormal = normalisasiNamaWilayah(namaKabupaten);
+  const daftarNama = new Set(
+    bagian.map(normalisasiNamaWilayah)
+  );
 
   const wilayah = WILAYAH_CURAH_HUJAN.find((item) => {
-    const namaData = item.nama.split(",")[0];
-
-    return normalisasiNamaWilayah(namaData) === namaNormal;
+    const namaKabupaten = item.nama.split(",")[0];
+    return daftarNama.has(normalisasiNamaWilayah(namaKabupaten));
   });
 
   return wilayah ? wilayah.curahHujanMm : null;
