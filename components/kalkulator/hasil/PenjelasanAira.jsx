@@ -4,10 +4,51 @@ import { useEffect, useState } from "react";
 import { Info } from "lucide-react";
 import { mintaPenjelasanAira } from "@/lib/penjelasanAira";
 
-export default function PenjelasanAira({ hasil, masukan, pesanCadangan = "" }) {
+// Cache Promise untuk mencegah request AI yang sama dikirim berulang.
+// Berlaku juga ketika React Strict Mode menjalankan ulang effect.
+const cachePermintaan = new Map();
+const MAKS_CACHE_PERMINTAAN = 50;
+
+function buatKunciPermintaan(hasil, masukan) {
+  try {
+    return JSON.stringify({
+      waktuPerhitunganUtc: hasil?.waktuPerhitunganUtc,
+      hasil,
+      masukan,
+    });
+  } catch {
+    return null;
+  }
+}
+
+function ambilPenjelasanSekali(kunci, hasil, masukan) {
+  if (cachePermintaan.has(kunci)) {
+    return cachePermintaan.get(kunci);
+  }
+
+  const permintaan = mintaPenjelasanAira(hasil, masukan);
+
+  cachePermintaan.set(kunci, permintaan);
+
+  // Batasi ukuran cache agar tidak terus bertambah.
+  if (cachePermintaan.size > MAKS_CACHE_PERMINTAAN) {
+    const kunciTerlama = cachePermintaan.keys().next().value;
+
+    if (kunciTerlama !== undefined) {
+      cachePermintaan.delete(kunciTerlama);
+    }
+  }
+
+  return permintaan;
+}
+
+export default function PenjelasanAira({
+  hasil,
+  masukan,
+  pesanCadangan = "",
+}) {
   const [state, setState] = useState({
-    hasil: null,
-    masukan: null,
+    kunci: null,
     tahap: "memuat",
     teks: "",
   });
@@ -15,11 +56,15 @@ export default function PenjelasanAira({ hasil, masukan, pesanCadangan = "" }) {
   const idPerhitungan = hasil?.waktuPerhitunganUtc;
   const hasilValid = Boolean(hasil && idPerhitungan);
 
-  const stateSesuai =
-    state.hasil === hasil &&
-    state.masukan === masukan;
+  const kunciPermintaan = hasilValid
+    ? buatKunciPermintaan(hasil, masukan)
+    : null;
 
-  const tahapTampilan = !hasilValid
+  const stateSesuai =
+    Boolean(kunciPermintaan) &&
+    state.kunci === kunciPermintaan;
+
+  const tahapTampilan = !hasilValid || !kunciPermintaan
     ? "gagal"
     : stateSesuai
       ? state.tahap
@@ -30,7 +75,7 @@ export default function PenjelasanAira({ hasil, masukan, pesanCadangan = "" }) {
   useEffect(() => {
     let batal = false;
 
-    if (!hasil || !idPerhitungan) {
+    if (!hasilValid || !kunciPermintaan) {
       return () => {
         batal = true;
       };
@@ -38,7 +83,8 @@ export default function PenjelasanAira({ hasil, masukan, pesanCadangan = "" }) {
 
     async function ambilPenjelasan() {
       try {
-        const teksAI = await mintaPenjelasanAira(
+        const teksAI = await ambilPenjelasanSekali(
+          kunciPermintaan,
           hasil,
           masukan
         );
@@ -50,15 +96,13 @@ export default function PenjelasanAira({ hasil, masukan, pesanCadangan = "" }) {
           teksAI.trim().length > 0
         ) {
           setState({
-            hasil,
-            masukan,
+            kunci: kunciPermintaan,
             tahap: "siap",
             teks: teksAI.trim(),
           });
         } else {
           setState({
-            hasil,
-            masukan,
+            kunci: kunciPermintaan,
             tahap: "gagal",
             teks: "",
           });
@@ -71,8 +115,7 @@ export default function PenjelasanAira({ hasil, masukan, pesanCadangan = "" }) {
 
         if (!batal) {
           setState({
-            hasil,
-            masukan,
+            kunci: kunciPermintaan,
             tahap: "gagal",
             teks: "",
           });
@@ -85,7 +128,7 @@ export default function PenjelasanAira({ hasil, masukan, pesanCadangan = "" }) {
     return () => {
       batal = true;
     };
-  }, [hasil, masukan, idPerhitungan]);
+  }, [hasilValid, kunciPermintaan, hasil, masukan]);
 
   return (
     <div aria-live="polite" className="space-y-3">

@@ -11,6 +11,7 @@
 // dan mengurutkan tindakan TAMBAHAN dari katalog serta menulis alasan singkat;
 // tindakan wajib selalu dipasang kode di urutan teratas. Jika AI gagal, urutan aturan dipakai.
 
+
 import {
   STATUS_AMAN,
   STATUS_KRISIS,
@@ -19,23 +20,26 @@ import {
 } from "@/services/calculatorService";
 
 import { KATALOG_FALLBACK } from "@/data/katalogTindakanFallback";
+
 import {
   BATAS_KANDIDAT_AI,
   pilihTindakanDenganAI,
 } from "@/services/aiService";
+
+// ======================================================
+// 1. KONFIGURASI
+// ======================================================
 
 export const TABEL_KATALOG =
   process.env.SUPABASE_TABLE_KATALOG || "katalog_tindakan";
 
 export const BATAS_REKOMENDASI = 5;
 
-// Ubah menjadi false jika Navigation Air belum tersedia.
 export const FITUR_NAVIGATION_AIR_TERSEDIA = true;
 
 const TTL_CACHE_MS = 5 * 60 * 1000;
 const TIMEOUT_SUPABASE_MS = 3000;
 
-// ID tindakan yang wajib tersedia dalam katalog.
 export const ID = {
   NAVIGATION_AIR: "buka_navigation_air",
   PERIKSA_DATA: "periksa_data_kalkulator",
@@ -48,7 +52,8 @@ const KOLOM_PRIORITAS = {
   [STATUS_AMAN]: "prioritas_aman",
   [STATUS_WASPADA]: "prioritas_waspada",
   [STATUS_KRISIS]: "prioritas_krisis",
-  [STATUS_TIDAK_DITENTUKAN]: "prioritas_belum_ditentukan",
+  [STATUS_TIDAK_DITENTUKAN]:
+    "prioritas_belum_ditentukan",
 };
 
 const KONDISI_DIKENAL = [
@@ -80,7 +85,9 @@ export const AKSI_UTAMA_PER_STATUS = {
   [STATUS_TIDAK_DITENTUKAN]: "Periksa Kembali Data",
 };
 
-// 1. PEMBERSIH NILAI
+// ======================================================
+// 2. PEMBERSIH DAN NORMALISASI NILAI
+// ======================================================
 
 const kosong = (v) =>
   v == null ||
@@ -103,24 +110,30 @@ const daftar = (v) =>
     .filter(Boolean);
 
 const yaTidak = (v) => {
-  const k = kunci(v);
+  const nilai = kunci(v);
 
-  if (["ya", "yes", "true", "1", "aktif"].includes(k)) {
+  if (["ya", "yes", "true", "1", "aktif"].includes(nilai)) {
     return "ya";
   }
 
-  if (["tidak", "no", "false", "0", "nonaktif", ""].includes(k)) {
+  if (
+    ["tidak", "no", "false", "0", "nonaktif", ""].includes(
+      nilai
+    )
+  ) {
     return "tidak";
   }
 
-  return k;
+  return nilai;
 };
 
 // null jika kosong; NaN jika terisi tetapi bukan angka.
 const angka = (v) => {
   if (kosong(v)) return null;
 
-  const hasil = Number(String(v).trim().replace(",", "."));
+  const hasil = Number(
+    String(v).trim().replace(",", ".")
+  );
 
   return Number.isFinite(hasil) ? hasil : NaN;
 };
@@ -134,18 +147,25 @@ const ATURAN_WAJIB_DIKENAL = new Set([
   "jika ada dugaan kontaminasi",
 ]);
 
+// ======================================================
+// 3. VALIDASI DAN NORMALISASI KATALOG
+// ======================================================
 
-// 2. VALIDASI DAN NORMALISASI KATALOG
 export function normalisasiKatalog(baris) {
   const statusDikenal = new Map(
-    Object.keys(KOLOM_PRIORITAS).map((s) => [kunci(s), s])
+    Object.keys(KOLOM_PRIORITAS).map((status) => [
+      kunci(status),
+      status,
+    ])
   );
 
   const records = [];
   const masalah = [];
   const terlihat = new Set();
 
-  for (const [i, row] of (Array.isArray(baris) ? baris : []).entries()) {
+  const sumber = Array.isArray(baris) ? baris : [];
+
+  for (const [i, row] of sumber.entries()) {
     const aid = teks(row?.action_id);
     const galat = [];
 
@@ -158,58 +178,82 @@ export function normalisasiKatalog(baris) {
     if (aid) terlihat.add(aid);
 
     if (!teks(row?.teks_tindakan)) {
-      galat.push(`${aid || `baris ${i + 1}`}: teks_tindakan kosong`);
+      galat.push(
+        `${aid || `baris ${i + 1}`}: teks_tindakan kosong`
+      );
     }
 
+    // Validasi status yang berlaku.
     const status = new Set();
 
-    for (const s of daftar(row?.status_berlaku)) {
-      if (statusDikenal.has(kunci(s))) {
-        status.add(statusDikenal.get(kunci(s)));
+    for (const nilaiStatus of daftar(row?.status_berlaku)) {
+      const statusNormal = statusDikenal.get(
+        kunci(nilaiStatus)
+      );
+
+      if (statusNormal) {
+        status.add(statusNormal);
       } else {
-        galat.push(`${aid}: status tidak dikenal '${s}'`);
+        galat.push(
+          `${aid}: status tidak dikenal '${nilaiStatus}'`
+        );
       }
     }
 
+    if (status.size === 0) {
+      galat.push(`${aid}: status_berlaku kosong`);
+    }
+
+    // Validasi kondisi sumber.
     const kondisi = new Set(
       daftar(row?.kondisi_sumber_berlaku).map(kunci)
     );
 
     if (kondisi.size === 0) {
-      galat.push(`${aid}: kondisi_sumber_berlaku kosong`);
+      galat.push(
+        `${aid}: kondisi_sumber_berlaku kosong`
+      );
     }
 
-    for (const k of kondisi) {
-      if (!KONDISI_DIKENAL.includes(k)) {
-        galat.push(`${aid}: kondisi tidak dikenal '${k}'`);
+    for (const nilaiKondisi of kondisi) {
+      if (!KONDISI_DIKENAL.includes(nilaiKondisi)) {
+        galat.push(
+          `${aid}: kondisi tidak dikenal '${nilaiKondisi}'`
+        );
       }
     }
 
+    // Validasi aturan wajib.
     const wajib = yaTidak(row?.wajib);
+
+    if (!ATURAN_WAJIB_DIKENAL.has(wajib)) {
+      galat.push(
+        `${aid}: aturan wajib tidak dikenal '${teks(row?.wajib)}'`
+      );
+    }
+
+    // Nama kolom ini harus sama dengan Supabase.
     const prioritas = {};
 
-    for (const [s, kolom] of Object.entries(KOLOM_PRIORITAS)) {
+    for (const [statusKunci, kolom] of Object.entries(
+      KOLOM_PRIORITAS
+    )) {
       const nilai = angka(row?.[kolom]);
 
       if (Number.isNaN(nilai)) {
         galat.push(
           `${aid}: ${kolom} bukan angka ('${row?.[kolom]}')`
         );
-        prioritas[s] = null;
+
+        prioritas[statusKunci] = null;
       } else {
-        prioritas[s] = nilai;
+        prioritas[statusKunci] = nilai;
       }
     }
 
-    if (galat.length) {
+    if (galat.length > 0) {
       masalah.push(...galat);
       continue;
-    }
-
-    if (!ATURAN_WAJIB_DIKENAL.has(wajib)) {
-      masalah.push(
-        `${aid}: aturan wajib tidak dikenal '${teks(row?.wajib)}' (dianggap tidak wajib)`
-      );
     }
 
     records.push({
@@ -218,43 +262,60 @@ export function normalisasiKatalog(baris) {
       nama: teks(row?.nama_tindakan),
       tindakan: teks(row?.teks_tindakan),
       konteks: teks(row?.konteks_pemicu),
+
       status,
       kondisi,
+
       syaratMhm: yaTidak(row?.syarat_mhm) === "ya",
       wajib,
+
       prioritas,
+
       cta: teks(row?.cta),
       pesanPengguna: teks(row?.pesan_pengguna),
       catatanKeamanan: teks(row?.catatan_keamanan),
       dasarRujukan: teks(row?.dasar_rujukan),
+
       aktif: yaTidak(row?.aktif) === "ya",
     });
   }
 
-  return { records, masalah };
+  return {
+    records,
+    masalah,
+  };
 }
 
-
-// 3. VALIDASI KELAYAKAN KATALOG
+// ======================================================
+// 4. VALIDASI KELAYAKAN KATALOG
+// ======================================================
 
 function katalogLayak(records) {
-  const ids = new Set(
-    records.filter((r) => r.aktif).map((r) => r.id)
+  if (!Array.isArray(records) || records.length === 0) {
+    return false;
+  }
+
+  const idsAktif = new Set(
+    records
+      .filter((record) => record.aktif)
+      .map((record) => record.id)
   );
 
-  return (
-    records.length > 0 &&
-    Object.values(ID).every((id) => ids.has(id))
+  return Object.values(ID).every((id) =>
+    idsAktif.has(id)
   );
 }
 
-
-// 4. PENGAMBILAN KATALOG DARI SUPABASE
+// ======================================================
+// 5. PENGAMBILAN KATALOG DARI SUPABASE
+// ======================================================
 
 let cache = {
   records: null,
   waktu: 0,
 };
+
+let permintaanKatalog = null;
 
 async function bacaDariSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -264,10 +325,14 @@ async function bacaDariSupabase() {
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
   if (!url || !kunciPublik) {
-    throw new Error("Variabel lingkungan Supabase belum diatur");
+    throw new Error(
+      "Variabel lingkungan Supabase belum diatur."
+    );
   }
 
-  const { createClient } = await import("@supabase/supabase-js");
+  const { createClient } = await import(
+    "@supabase/supabase-js"
+  );
 
   const client = createClient(url, kunciPublik, {
     auth: {
@@ -281,15 +346,17 @@ async function bacaDariSupabase() {
     .select("*")
     .order("action_id")
     .limit(1000)
-    .abortSignal(AbortSignal.timeout(TIMEOUT_SUPABASE_MS));
+    .abortSignal(
+      AbortSignal.timeout(TIMEOUT_SUPABASE_MS)
+    );
 
   if (error) {
     throw new Error(error.message);
   }
 
-  if (!data?.length) {
+  if (!Array.isArray(data) || data.length === 0) {
     throw new Error(
-      `Tabel '${TABEL_KATALOG}' kosong atau tidak terbaca. Periksa kebijakan RLS.`
+      `Tabel '${TABEL_KATALOG}' kosong atau tidak terbaca.`
     );
   }
 
@@ -301,37 +368,73 @@ export function kosongkanCacheKatalog() {
     records: null,
     waktu: 0,
   };
+
+  permintaanKatalog = null;
+}
+
+function ambilKatalogCadangan() {
+  const { records, masalah } = normalisasiKatalog(
+    KATALOG_FALLBACK
+  );
+
+  if (masalah.length > 0) {
+    console.warn(
+      `[rekomendasi] ${masalah.length} masalah pada katalog fallback:`,
+      masalah.slice(0, 10)
+    );
+  }
+
+  if (!katalogLayak(records)) {
+    console.error(
+      "[rekomendasi] Katalog fallback belum memenuhi seluruh ID tindakan acuan."
+    );
+  }
+
+  return {
+    records,
+    sumber: "cadangan",
+  };
 }
 
 export async function ambilKatalog({
   paksaCadangan = false,
 } = {}) {
-  if (!paksaCadangan) {
-    if (
-      cache.records &&
-      Date.now() - cache.waktu < TTL_CACHE_MS
-    ) {
-      return {
-        records: cache.records,
-        sumber: "supabase",
-      };
-    }
+  if (paksaCadangan) {
+    return ambilKatalogCadangan();
+  }
 
+  if (
+    cache.records &&
+    Date.now() - cache.waktu < TTL_CACHE_MS
+  ) {
+    return {
+      records: cache.records,
+      sumber: "cache",
+    };
+  }
+
+  if (permintaanKatalog) {
+    return permintaanKatalog;
+  }
+
+  permintaanKatalog = (async () => {
     try {
+      const data = await bacaDariSupabase();
+
       const { records, masalah } = normalisasiKatalog(
-        await bacaDariSupabase()
+        data
       );
 
       if (!katalogLayak(records)) {
         throw new Error(
-          "Katalog tidak layak: kosong atau tindakan acuan aturan hilang"
+          "Katalog Supabase tidak memenuhi seluruh ID tindakan acuan."
         );
       }
 
-      if (masalah.length) {
+      if (masalah.length > 0) {
         console.warn(
-          `[rekomendasi] ${masalah.length} masalah data katalog:`,
-          masalah.slice(0, 5)
+          `[rekomendasi] ${masalah.length} masalah data katalog Supabase:`,
+          masalah.slice(0, 10)
         );
       }
 
@@ -346,61 +449,82 @@ export async function ambilKatalog({
       };
     } catch (err) {
       console.warn(
-        "[rekomendasi] katalog Supabase tidak dipakai:",
-        err.message
+        "[rekomendasi] Katalog Supabase tidak dapat digunakan:",
+        err?.message || err
       );
 
-      if (cache.records) {
+      if (cache.records && katalogLayak(cache.records)) {
         return {
           records: cache.records,
           sumber: "cache",
         };
       }
-    }
-  }
 
-  return {
-    records: normalisasiKatalog(KATALOG_FALLBACK).records,
-    sumber: "cadangan",
-  };
+      return ambilKatalogCadangan();
+    } finally {
+      permintaanKatalog = null;
+    }
+  })();
+
+  return permintaanKatalog;
 }
 
-// 5. MEMBANGUN KONTEKS PENGGUNA
+// ======================================================
+// 6. MEMBANGUN KONTEKS PENGGUNA
+// ======================================================
 
 export function bangunKonteks(masukan, hasil) {
   const valid = hasil?.valid === true;
 
   const status =
-    valid && hasil.status in KOLOM_PRIORITAS
+    valid &&
+    typeof hasil?.status === "string" &&
+    Object.hasOwn(KOLOM_PRIORITAS, hasil.status)
       ? hasil.status
       : STATUS_TIDAK_DITENTUKAN;
 
-  const jumlahMhm = Number(masukan?.anggotaMhm);
+  const jumlahMhm = Number(
+    masukan?.anggotaMhm ?? masukan?.jumlahAnggotaMhm
+  );
 
   const mhmAktif =
-    masukan?.mhm === true &&
+    yaTidak(masukan?.mhm) === "ya" &&
     Number.isInteger(jumlahMhm) &&
     jumlahMhm > 0;
 
-  const kondisi = kunci(masukan?.kondisi);
+  const kondisi = kunci(
+    masukan?.kondisi ??
+      masukan?.kondisiSumberAir ??
+      masukan?.kondisiSumber
+  );
 
   return {
     valid,
     status,
     kondisi,
+
     mhmAktif,
     jumlahMhm: mhmAktif ? jumlahMhm : 0,
-    sumberAir: teks(masukan?.sumberAir),
-    dugaanKontaminasi: masukan?.dugaanKontaminasi === true,
+
+    sumberAir: teks(
+      masukan?.sumberAir ??
+        masukan?.sumberAirUtama
+    ),
+
+    dugaanKontaminasi:
+      masukan?.dugaanKontaminasi === true,
+
     dataTidakTerverifikasi:
       !valid ||
       status === STATUS_TIDAK_DITENTUKAN ||
-      kondisi === "belum diketahui",
+      kondisi === "belum diketahui" ||
+      kondisi === "",
   };
 }
 
-
-// 6. ATURAN WAJIB
+// ======================================================
+// 7. ATURAN TINDAKAN WAJIB
+// ======================================================
 
 function wajibBerlaku(rec, ctx) {
   switch (rec.wajib) {
@@ -422,23 +546,28 @@ function wajibBerlaku(rec, ctx) {
     case "jika ada dugaan kontaminasi":
       return ctx.dugaanKontaminasi;
 
+    case "tidak":
     default:
       return false;
   }
 }
 
+// ======================================================
+// 8. PENYUSUNAN KANDIDAT REKOMENDASI
+// ======================================================
 
-// 7. PENYUSUNAN KANDIDAT REKOMENDASI
-
-// Urutan akhir (sama dengan notebook Bagian 5): tindakan WAJIB dahulu,
-// lalu prioritas terkecil, lalu id agar hasilnya stabil.
 const bandingkanRekomendasi = (a, b) =>
   Number(!a.wajib) - Number(!b.wajib) ||
-  (a.prioritas ?? Infinity) - (b.prioritas ?? Infinity) ||
+  (a.prioritas ?? Infinity) -
+    (b.prioritas ?? Infinity) ||
   (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 
 export function susunKatalog(records, ctx) {
   const hasil = [];
+
+  if (!Array.isArray(records)) {
+    return hasil;
+  }
 
   for (const rec of records) {
     if (!rec.aktif || !rec.status.has(ctx.status)) {
@@ -467,6 +596,7 @@ export function susunKatalog(records, ctx) {
       id: rec.id,
       kategori: rec.kategori,
       nama: rec.nama,
+
       teks: rec.tindakan
         .replaceAll(
           "{jumlah_mhm}",
@@ -476,9 +606,11 @@ export function susunKatalog(records, ctx) {
           "{sumber}",
           ctx.sumberAir || "sumber air utama"
         ),
+
       konteks: rec.konteks,
       prioritas,
       wajib,
+
       cta: rec.cta,
       pesanPengguna: rec.pesanPengguna,
       catatanKeamanan: rec.catatanKeamanan,
@@ -489,29 +621,36 @@ export function susunKatalog(records, ctx) {
   return hasil.sort(bandingkanRekomendasi);
 }
 
-
-// 8. PEMILIHAN REKOMENDASI
+// ======================================================
+// 9. PEMILIHAN REKOMENDASI BERBASIS ATURAN
+// ======================================================
 
 export function pilihRekomendasi(
   records,
   ctx,
   batas = BATAS_REKOMENDASI
 ) {
-  // Kandidat sudah terurut: wajib dahulu, lalu prioritas terkecil.
+  const batasAman =
+    Number.isInteger(batas) && batas > 0
+      ? batas
+      : BATAS_REKOMENDASI;
+
   const kandidat = susunKatalog(records, ctx);
-  const dipilih = kandidat.slice(0, batas);
 
-  // Pengaman keselamatan: tindakan wajib tidak pernah dibuang. Normalnya jumlah
-  // wajib <= batas, sehingga daftar tetap 5. Jika lebih, daftar memanjang.
-  for (const item of kandidat) {
-    if (item.wajib && !dipilih.includes(item)) {
-      dipilih.push(item);
-    }
-  }
+  const wajib = kandidat.filter((item) => item.wajib);
+  const nonWajib = kandidat.filter((item) => !item.wajib);
 
-  if (dipilih.length > batas) {
+  const dipilih = [
+    ...wajib,
+    ...nonWajib.slice(
+      0,
+      Math.max(0, batasAman - wajib.length)
+    ),
+  ];
+
+  if (wajib.length > batasAman) {
     console.warn(
-      `[rekomendasi] tindakan wajib (${dipilih.length}) melebihi batas ${batas}; periksa katalog`
+      `[rekomendasi] Jumlah tindakan wajib (${wajib.length}) melebihi batas (${batasAman}). Semua tindakan wajib dipertahankan.`
     );
   }
 
@@ -519,48 +658,94 @@ export function pilihRekomendasi(
     status: ctx.status,
     ringkasan: RINGKASAN_PER_STATUS[ctx.status],
     aksiUtama: AKSI_UTAMA_PER_STATUS[ctx.status],
-    items: dipilih.map((x, i) => ({
+
+    items: dipilih.map((item, i) => ({
       urutan: i + 1,
-      ...x,
+      ...item,
     })),
+
     tautan: {
       navigationAir: ctx.status === STATUS_KRISIS,
-      airaAssistant: ctx.status !== STATUS_TIDAK_DITENTUKAN,
+      airaAssistant:
+        ctx.status !== STATUS_TIDAK_DITENTUKAN,
     },
   };
 }
 
 // ======================================================
-// 9. TITIK MASUK SERVER ACTION
+// 10. PENGGABUNGAN HASIL AI DAN ATURAN
 // ======================================================
 
-/**
- * Gabungkan pilihan AI dengan tindakan wajib.
- * - Tindakan wajib selalu di atas (urutan aturan).
- * - Tindakan tambahan: urutan dari AI; kekurangan diisi dari urutan aturan.
- * - Teks tindakan tidak pernah diubah; AI hanya menambahkan `alasan`.
- */
-export function susunDenganAI({ wajib, nonWajib, jumlah, hasilAI }) {
-  const peta = new Map(nonWajib.map((x) => [x.id, x]));
+export function susunDenganAI({
+  wajib,
+  nonWajib,
+  kandidatAI,
+  jumlah,
+  hasilAI,
+}) {
+  const daftarWajib = Array.isArray(wajib) ? wajib : [];
+  const daftarNonWajib = Array.isArray(nonWajib)
+    ? nonWajib
+    : [];
+
+  const daftarKandidatAI = Array.isArray(kandidatAI)
+    ? kandidatAI
+    : [];
+
+  const idsAI = Array.isArray(hasilAI?.ids)
+    ? hasilAI.ids
+    : [];
+
+  // AI hanya boleh memilih kandidat yang dikirim kepadanya.
+  const petaKandidat = new Map(
+    daftarKandidatAI.map((item) => [item.id, item])
+  );
+
   const tambahan = [];
 
-  for (const id of hasilAI.ids) {
-    const item = peta.get(id);
-    if (item && !tambahan.includes(item)) tambahan.push(item);
-    if (tambahan.length >= jumlah) break;
-  }
-  for (const item of nonWajib) {
-    if (tambahan.length >= jumlah) break;
-    if (!tambahan.includes(item)) tambahan.push(item);
+  const batasTambahan =
+    Number.isInteger(jumlah) && jumlah > 0
+      ? jumlah
+      : 0;
+
+  for (const idMentah of idsAI) {
+    const id = String(idMentah).trim();
+    const item = petaKandidat.get(id);
+
+    if (!item || tambahan.includes(item)) {
+      continue;
+    }
+
+    tambahan.push(item);
+
+    if (tambahan.length >= batasTambahan) {
+      break;
+    }
   }
 
-  return [...wajib, ...tambahan].map((x, i) => ({
-    urutan: i + 1,
-    ...x,
-    alasan: hasilAI.alasan?.[x.id],
-  }));
+  // Isi kekurangan dengan urutan aturan.
+  for (const item of daftarNonWajib) {
+    if (tambahan.length >= batasTambahan) {
+      break;
+    }
+
+    if (!tambahan.includes(item)) {
+      tambahan.push(item);
+    }
+  }
+
+  return [...daftarWajib, ...tambahan].map(
+    (item, i) => ({
+      urutan: i + 1,
+      ...item,
+      alasan: hasilAI?.alasan?.[item.id] || null,
+    })
+  );
 }
 
+// ======================================================
+// 11. TITIK MASUK RECOMMENDATION SYSTEM
+// ======================================================
 
 export async function ambilRekomendasi(
   masukan,
@@ -570,27 +755,22 @@ export async function ambilRekomendasi(
   const ctx = bangunKonteks(masukan, hasil);
 
   try {
-    // 1. Ambil katalog dari Supabase, cache, atau fallback.
     const { records, sumber } = await ambilKatalog();
 
-    // 2. Susun rekomendasi menggunakan aturan deterministik.
-    // Hasil ini menjadi fallback utama jika AI gagal.
+    // Rule engine selalu dijalankan terlebih dahulu.
     const aturan = pilihRekomendasi(records, ctx);
 
-    let akhir = {
+    const akhir = {
       ...aturan,
       sumberKatalog: sumber,
       pemilih: "aturan",
     };
 
-    // 3. Jangan panggil AI jika tidak diizinkan.
-    // Misalnya, kalkulator meminta hasil langsung tanpa menunggu Gemini.
     if (!pakaiAI) {
       return akhir;
     }
 
-    // 4. AI hanya boleh membantu memilih tindakan tambahan.
-    // AI tidak menentukan status dan tidak mengubah tindakan wajib.
+    // AI tidak digunakan untuk data tidak valid atau status belum ditentukan.
     if (
       !ctx.valid ||
       ctx.status === STATUS_TIDAK_DITENTUKAN ||
@@ -599,7 +779,6 @@ export async function ambilRekomendasi(
       return akhir;
     }
 
-    // 5. Pisahkan tindakan wajib dan tindakan tambahan.
     const kandidat = susunKatalog(records, ctx);
 
     const wajib = kandidat.filter((item) => item.wajib);
@@ -610,27 +789,26 @@ export async function ambilRekomendasi(
       BATAS_REKOMENDASI - wajib.length
     );
 
-    // 6. Tidak perlu memanggil AI jika:
-    // - Tidak ada slot tambahan.
-    // - Jumlah kandidat tidak melebihi kebutuhan.
     if (jumlah === 0 || nonWajib.length <= jumlah) {
       return akhir;
     }
 
-    // 7. Pemanggilan AI memiliki try-catch tersendiri.
-    // Jika gagal, rekomendasi aturan tetap digunakan.
+    const kandidatAI = nonWajib.slice(
+      0,
+      BATAS_KANDIDAT_AI
+    );
+
     try {
       const hasilAI = await pilihTindakanDenganAI(
         hasil,
         masukan,
         {
           wajib,
-          kandidat: nonWajib.slice(0, BATAS_KANDIDAT_AI),
+          kandidat: kandidatAI,
           jumlah,
         }
       );
 
-      // 8. Pastikan respons AI memiliki struktur yang diharapkan.
       const responsValid =
         hasilAI?.ok === true &&
         Array.isArray(hasilAI.ids);
@@ -643,25 +821,22 @@ export async function ambilRekomendasi(
         return akhir;
       }
 
-      // 9. Susun ulang tindakan tambahan berdasarkan hasil AI.
-      // Tindakan wajib tetap berada di urutan teratas.
+      // PENTING: kandidatAI wajib dikirim ke susunDenganAI.
       const itemsAI = susunDenganAI({
         wajib,
         nonWajib,
+        kandidatAI,
         jumlah,
         hasilAI,
       });
 
-      akhir = {
+      return {
         ...aturan,
         items: itemsAI,
         sumberKatalog: sumber,
         pemilih: `ai:${hasilAI.model || "model-tidak-diketahui"}`,
       };
-
-      return akhir;
     } catch (err) {
-      // Error AI tidak boleh menghilangkan hasil rekomendasi aturan.
       console.warn(
         "[rekomendasi] Pemilihan AI gagal. Menggunakan urutan aturan:",
         err?.message || err
@@ -670,7 +845,6 @@ export async function ambilRekomendasi(
       return akhir;
     }
   } catch (err) {
-    // 10. Penanganan jika proses pengambilan katalog atau penyusunan aturan gagal.
     console.error(
       "[rekomendasi] Gagal menyusun rekomendasi:",
       err
@@ -681,10 +855,13 @@ export async function ambilRekomendasi(
       ringkasan: RINGKASAN_PER_STATUS[ctx.status],
       aksiUtama: AKSI_UTAMA_PER_STATUS[ctx.status],
       items: [],
+
       tautan: {
         navigationAir: ctx.status === STATUS_KRISIS,
-        airaAssistant: ctx.status !== STATUS_TIDAK_DITENTUKAN,
+        airaAssistant:
+          ctx.status !== STATUS_TIDAK_DITENTUKAN,
       },
+
       sumberKatalog: "tidak-tersedia",
       pemilih: "aturan",
     };

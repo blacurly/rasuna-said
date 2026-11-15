@@ -61,7 +61,7 @@ export default function HasilActions({ statusKey }) {
         className="inline-flex min-h-13 items-center justify-center gap-2 rounded-full bg-aira-sand px-6 font-semibold text-aira-primary transition-colors hover:bg-aira-sand-border"
       >
         <Bookmark className="size-5" aria-hidden="true" />
-        Masuk untuk Menyimpan Hasil
+        Simpan Hasil Kalkulator
       </Link>
 
       <p className="text-center text-[13px] leading-relaxed text-aira-text/70">

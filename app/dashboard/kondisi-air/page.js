@@ -1,24 +1,42 @@
 import DashboardPageHead from "@/components/dashboard/DashboardPageHead";
 import ProfilKeluargaForm from "@/components/dashboard/kondisi-air/ProfilKeluargaForm";
-import RingkasanKondisi, { RingkasanKosong } from "@/components/dashboard/kondisi-air/RingkasanKondisi";
+import RingkasanKondisi, {
+  RingkasanKosong,
+} from "@/components/dashboard/kondisi-air/RingkasanKondisi";
 import RiwayatPerhitungan from "@/components/dashboard/kondisi-air/RiwayatPerhitungan";
+
 import { ambilProfilDashboard } from "@/lib/dashboardProfile";
 import { hitungStatusDashboard } from "@/lib/statusDashboard";
 import { formatTanggalIso } from "@/lib/waktuDashboard";
+
 import { ambilDataDashboard } from "@/services/dashboardService";
+import { ambilRiwayatKalkulator } from "@/app/actions/riwayat";
 
 export const metadata = {
   title: "Kondisi Air Rumah Tangga - AIRA",
 };
 
-// B02 - Kondisi Air Rumah Tangga: ringkasan, riwayat perhitungan, dan profil keluarga.
-// Data sementara dari services/dashboardService.js (simulasi).
+// B02 - Kondisi Air Rumah Tangga:
+// ringkasan, riwayat perhitungan, dan profil keluarga.
 export default async function KondisiAirRumahTanggaPage() {
   const profile = await ambilProfilDashboard();
-  const { keluarga, catatan, riwayat } = await ambilDataDashboard();
 
-  // Ringkasan memakai catatan terbaru (sumber yang sama dengan B01).
+  // Data keluarga dan catatan ringkasan tetap menggunakan sumber sebelumnya.
+  const {
+    keluarga,
+    catatan,
+  } = await ambilDataDashboard();
+
+  // Ambil riwayat kalkulator dari Supabase berdasarkan pengguna yang login.
+  const hasilRiwayat = await ambilRiwayatKalkulator();
+
+  const dataRiwayat = hasilRiwayat.ok
+    ? hasilRiwayat.data
+    : [];
+
+  // Ringkasan tetap memakai catatan terbaru dari dashboard.
   const terbaru = catatan[0] ?? null;
+
   const status = terbaru
     ? hitungStatusDashboard({
         liter: terbaru.liter,
@@ -27,23 +45,63 @@ export default async function KondisiAirRumahTanggaPage() {
         kondisiSumberAir: keluarga.kondisiSumberAir,
       })
     : null;
-  const tanggal = terbaru ? formatTanggalIso(terbaru.tanggal) : null;
 
-  // Status tiap perhitungan dihitung dari data yang tersimpan pada riwayat tersebut.
-  const baris = riwayat.map((r) => ({
-    ...r,
-    tanggalPenuh: formatTanggalIso(r.tanggal).tanggalPenuh,
-    status: hitungStatusDashboard({
-      liter: r.liter,
-      anggota: r.anggota,
-      anggotaMhm: r.anggotaMhm,
-      kondisiSumberAir: r.kondisiSumberAir,
-    }),
-  }));
+  const tanggal = terbaru
+    ? formatTanggalIso(terbaru.tanggal)
+    : null;
+
+  // Ubah data database menjadi format yang dibutuhkan RiwayatPerhitungan.
+  const baris = dataRiwayat.map((r) => {
+    const snapshot = r.input_snapshot ?? {};
+    const masukan = snapshot.input ?? {};
+
+    const anggota = Number(masukan.anggota ?? 0);
+    const anggotaMhm = masukan.mhm
+      ? Number(masukan.anggotaMhm ?? 0)
+      : 0;
+
+    const kondisiSumberAir =
+      r.water_condition || masukan.kondisi || "Belum diketahui";
+
+    const liter = Number(r.available_water_liters ?? 0);
+
+    const tanggalRiwayat = formatTanggalIso(r.assessed_at);
+
+    return {
+      id: r.assessment_id,
+
+      tanggalPenuh: tanggalRiwayat.tanggalPenuh,
+      waktu: tanggalRiwayat.waktu,
+
+      lokasi: masukan.lokasi || "",
+      sumberAir: masukan.sumberAir || "",
+
+      kondisiSumberAir,
+
+      anggota,
+      anggotaMhm,
+      luasAtap: masukan.luasAtap
+        ? Number(masukan.luasAtap)
+        : 0,
+
+      liter,
+
+      kapasitasTandonLiter: Number(masukan.kapasitas ?? 0),
+
+      status: hitungStatusDashboard({
+        liter,
+        anggota,
+        anggotaMhm,
+        kondisiSumberAir,
+      }),
+    };
+  });
 
   const awalProfil = {
     ...keluarga,
-    namaRumahTangga: keluarga.namaRumahTangga ?? `Keluarga ${profile.full_name || "AIRA"}`,
+    namaRumahTangga:
+      keluarga.namaRumahTangga ??
+      `Keluarga ${profile.full_name || "AIRA"}`,
   };
 
   return (
