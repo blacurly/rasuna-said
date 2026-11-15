@@ -1,0 +1,6 @@
+pymupdf
+supabase
+gdown
+sentence-transformers
+pytesseract
+pillow
