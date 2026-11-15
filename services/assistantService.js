@@ -31,7 +31,7 @@ const JUMLAH_CHUNK_DOKUMEN_SPESIFIK = Math.min(
 );
 
 const AMBANG_KEMIRIPAN = Number(
-  process.env.SIMILARITY_THRESHOLD || 0.35
+  process.env.SIMILARITY_THRESHOLD || 0.525
 );
 
 const EMBEDDING_TIMEOUT_MS = 30000;

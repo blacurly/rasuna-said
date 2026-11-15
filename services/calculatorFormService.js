@@ -1,23 +1,12 @@
-// Lapisan penghubung antara formulir Kalkulator dan services/calculatorService.js (Tria).
-// calculatorService.js TIDAK diubah: rumus, ambang, dan klasifikasinya tetap dipakai apa adanya.
-// File ini hanya:
-// 1. Memvalidasi batas input.
-// 2. Memetakan nama field dan penulisan kondisi.
-// 3. Menghitung volume cadangan dengan urutan operasi yang tepat.
-// 4. Menghitung panen hujan berdasarkan wilayah terpilih.
-
 import {
-  KOEFISIEN_PANEN_AIR_HUJAN,
   KEBUTUHAN_PER_ORANG_LITER_HARI,
+  TAMBAHAN_AIR_MHM_PER_ORANG_LITER_HARI,
   STATUS_AMAN,
   STATUS_KRISIS,
   STATUS_TIDAK_DITENTUKAN,
   STATUS_WASPADA,
-  TAMBAHAN_AIR_MHM_PER_ORANG_LITER_HARI,
   hitungKetahananAir,
 } from "@/services/calculatorService";
-
-import { cariCurahHujan } from "@/data/curahHujan";
 
 export const BASIC_PER_ORANG = KEBUTUHAN_PER_ORANG_LITER_HARI;
 export const MHM_PER_ORANG = TAMBAHAN_AIR_MHM_PER_ORANG_LITER_HARI;
@@ -41,7 +30,6 @@ export const KONDISI_SUMBER_AIR = [
   "Belum diketahui",
 ];
 
-// Nilai awal formulir.
 export const INPUT_AWAL = {
   lokasi: "",
   anggota: 1,
@@ -54,8 +42,6 @@ export const INPUT_AWAL = {
   luasAtap: "",
 };
 
-// Pada tampilan: "Tidak Berfungsi".
-// Pada calculatorService: "Tidak berfungsi".
 const KONDISI_KE_SERVICE = {
   "Tidak Berfungsi": "Tidak berfungsi",
 };
@@ -74,17 +60,14 @@ const kosong = (value) =>
 const keAngka = (value) =>
   kosong(value) ? NaN : Number(value);
 
-// Memastikan input selalu berupa objek agar validasi tidak error.
 function normalisasiInput(input) {
-  return input && typeof input === "object" && !Array.isArray(input)
+  return input &&
+    typeof input === "object" &&
+    !Array.isArray(input)
     ? { ...INPUT_AWAL, ...input }
     : { ...INPUT_AWAL };
 }
 
-// Validasi input formulir.
-// Dipakai di browser (pesan di bawah kolom) dan di server (pemeriksaan akhir).
-// Mengembalikan:
-// { valid, errors: { anggota, kapasitas, persen, luasAtap, sumberAir, kondisi, mhm }, daftar: string[] }
 export function validasiInput(input) {
   const masukan = normalisasiInput(input);
   const errors = {};
@@ -100,7 +83,8 @@ export function validasiInput(input) {
     anggota <= MAX_ANGGOTA;
 
   if (!anggotaOk) {
-    errors.anggota = "Jumlah anggota keluarga harus 1 sampai 30.";
+    errors.anggota =
+      "Jumlah anggota keluarga harus 1 sampai 30.";
   }
 
   if (
@@ -114,7 +98,9 @@ export function validasiInput(input) {
       "Kapasitas penampungan harus lebih dari 0 dan paling banyak 100.000 liter.";
   }
 
-  if (!(Number.isFinite(persen) && persen >= 0 && persen <= 100)) {
+  if (
+    !(Number.isFinite(persen) && persen >= 0 && persen <= 100)
+  ) {
     errors.persen =
       "Persentase volume air harus berada di antara 0% dan 100%.";
   }
@@ -129,7 +115,8 @@ export function validasiInput(input) {
         luas <= MAX_LUAS_ATAP_M2
       )
     ) {
-      errors.luasAtap = "Luas atap harus antara 0 dan 1.000 m2.";
+      errors.luasAtap =
+        "Luas atap harus antara 0 dan 1.000 m2.";
     }
   }
 
@@ -163,29 +150,26 @@ export function validasiInput(input) {
   };
 }
 
-// Volume air saat ini (liter) untuk pratinjau di formulir.
-// Kapasitas dikali persen dahulu, baru dibagi 100.
 export function hitungVolumeSaatIni(kapasitas, persen) {
   const k = keAngka(kapasitas);
   const p = keAngka(persen);
 
-  if (!Number.isFinite(k) || k <= 0 || !Number.isFinite(p)) {
+  if (
+    !Number.isFinite(k) ||
+    k <= 0 ||
+    !Number.isFinite(p)
+  ) {
     return 0;
   }
 
   return (k * p) / 100;
 }
 
-// Menjalankan perhitungan lengkap.
-// Dipanggil dari Server Action (app/actions/kalkulator.js).
-export function jalankanKalkulator(input) {
+// Curah hujan diterima dari server melalui parameter kedua.
+// Nilai curah hujan menggunakan satuan mm/bulan.
+export function jalankanKalkulator(input, curahHujanMm = null) {
   const masukan = normalisasiInput(input);
   const cek = validasiInput(masukan);
-
-  // Lokasi bersifat opsional. Jika kosong, estimasi panen hujan tidak dilakukan.
-  const curahHujanMm = masukan.lokasi
-    ? cariCurahHujan(masukan.lokasi)
-    : null;
 
   if (!cek.valid) {
     return {
@@ -203,46 +187,35 @@ export function jalankanKalkulator(input) {
 
   const anggota = Number(masukan.anggota);
 
-  // Volume dihitung (kapasitas x persen) / 100 lalu dikirim sebagai
-  // volume aktual agar batas tepat 1 hari dan 3 hari tidak bergeser
-  // oleh pembulatan desimal komputer.
   const volume = hitungVolumeSaatIni(
     masukan.kapasitas,
     masukan.persen
   );
 
+  const luasAtap = kosong(masukan.luasAtap)
+    ? null
+    : Number(masukan.luasAtap);
+
   const hasil = hitungKetahananAir({
     jumlahAnggota: anggota,
     sumberAirUtama: masukan.sumberAir,
     kondisiSumberAir:
-      KONDISI_KE_SERVICE[masukan.kondisi] ?? masukan.kondisi,
+      KONDISI_KE_SERVICE[masukan.kondisi] ??
+      masukan.kondisi,
     volumeCadanganLiter: volume,
-    luasAtapM2: null,
+    luasAtapM2: luasAtap,
+    curahHujanMm,
     kebutuhanMhm: Boolean(masukan.mhm),
     jumlahAnggotaMhm: masukan.mhm
       ? Number(masukan.anggotaMhm)
       : 0,
   });
 
-  // Panen hujan: V = P x A x C.
-  // P berasal dari data curah hujan wilayah terpilih.
-  const luas = kosong(masukan.luasAtap)
-    ? 0
-    : Number(masukan.luasAtap);
-
-  const potensiPanen =
-    luas > 0 && curahHujanMm != null
-      ? Math.round(
-          luas *
-            curahHujanMm *
-            KOEFISIEN_PANEN_AIR_HUJAN
-        )
-      : null;
-
   return {
     ...hasil,
     statusKey: STATUS_KEY[hasil.status] ?? "belum",
-    potensiPanenAirHujanLiter: potensiPanen,
+    potensiPanenAirHujanLiter:
+      hasil.potensiPanenAirHujanLiter,
     curahHujanMmPerBulan: curahHujanMm,
     wilayah: masukan.lokasi || "",
   };

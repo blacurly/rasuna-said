@@ -1,10 +1,7 @@
-// aira-website/services/calculatorService.js
-
 // 1. KONSTANTA AMBANG BATAS & ASUMSI
 export const KEBUTUHAN_PER_ORANG_LITER_HARI = 15;
 export const TAMBAHAN_AIR_MHM_PER_ORANG_LITER_HARI = 5;
 export const KOEFISIEN_PANEN_AIR_HUJAN = 0.8;
-export const CURAH_HUJAN_STATIS_METER = 0.01; // 10 mm = 0.01 m
 
 export const BATAS_KRISIS_HARI = 1;
 export const BATAS_WASPADA_HARI = 3;
@@ -15,13 +12,33 @@ export const STATUS_KRISIS = "Mode Krisis";
 export const STATUS_TIDAK_DITENTUKAN = "Belum Dapat Ditentukan";
 
 // Helper internal
-const isInt = (val) => Number.isInteger(val) && typeof val === "number";
-const isAngka = (val) => typeof val === "number" && !isNaN(val) && isFinite(val);
+const isInt = (val) =>
+  Number.isInteger(val) && typeof val === "number";
 
-// 2. FUNGSI PANEN AIR HUJAN (V = P x A x C)
-export function hitungPotensiPanenAirHujan(luasAtapM2) {
-  if (!isAngka(luasAtapM2) || luasAtapM2 <= 0) return 0.0;
-  const volumeLiter = CURAH_HUJAN_STATIS_METER * luasAtapM2 * KOEFISIEN_PANEN_AIR_HUJAN * 1000;
+const isAngka = (val) =>
+  typeof val === "number" && Number.isFinite(val);
+
+// 2. FUNGSI PANEN AIR HUJAN
+// 1 mm hujan pada 1 m² atap = 1 liter air.
+// Curah hujan menggunakan rata-rata mm/bulan.
+export function hitungPotensiPanenAirHujan(
+  luasAtapM2,
+  curahHujanMm
+) {
+  if (
+    !isAngka(luasAtapM2) ||
+    luasAtapM2 <= 0 ||
+    !isAngka(curahHujanMm) ||
+    curahHujanMm < 0
+  ) {
+    return null;
+  }
+
+  const volumeLiter =
+    curahHujanMm *
+    luasAtapM2 *
+    KOEFISIEN_PANEN_AIR_HUJAN;
+
   return Number(volumeLiter.toFixed(2));
 }
 
@@ -32,29 +49,54 @@ export function klasifikasikanStatus(durasi, kondisiSumberAir) {
 
   if (durasi < BATAS_KRISIS_HARI) {
     statusDurasi = STATUS_KRISIS;
-    alasan = "Estimasi cadangan kurang dari 1 hari total kebutuhan air harian.";
+    alasan =
+      "Estimasi cadangan kurang dari 1 hari total kebutuhan air harian.";
   } else if (durasi <= BATAS_WASPADA_HARI) {
     statusDurasi = STATUS_WASPADA;
-    alasan = "Estimasi cadangan berada pada rentang 1 sampai 3 hari total kebutuhan air harian.";
+    alasan =
+      "Estimasi cadangan berada pada rentang 1 sampai 3 hari total kebutuhan air harian.";
   } else {
     statusDurasi = STATUS_AMAN;
-    alasan = "Estimasi cadangan lebih dari 3 hari berdasarkan total kebutuhan air harian.";
+    alasan =
+      "Estimasi cadangan lebih dari 3 hari berdasarkan total kebutuhan air harian.";
   }
 
   if (kondisiSumberAir === "Belum diketahui") {
-    return { statusDurasi, statusAkhir: STATUS_TIDAK_DITENTUKAN, alasan: "Kondisi sumber air utama belum diketahui." };
-  }
-  if (kondisiSumberAir === "Tidak berfungsi") {
-    return { statusDurasi, statusAkhir: STATUS_KRISIS, alasan: "Sumber air utama dilaporkan tidak berfungsi." };
-  }
-  if (kondisiSumberAir === "Terbatas" && statusDurasi === STATUS_AMAN) {
-    return { statusDurasi, statusAkhir: STATUS_WASPADA, alasan: "Cadangan cukup >3 hari, namun sumber air utama sedang terbatas." };
+    return {
+      statusDurasi,
+      statusAkhir: STATUS_TIDAK_DITENTUKAN,
+      alasan: "Kondisi sumber air utama belum diketahui.",
+    };
   }
 
-  return { statusDurasi, statusAkhir: statusDurasi, alasan };
+  if (kondisiSumberAir === "Tidak berfungsi") {
+    return {
+      statusDurasi,
+      statusAkhir: STATUS_KRISIS,
+      alasan: "Sumber air utama dilaporkan tidak berfungsi.",
+    };
+  }
+
+  if (
+    kondisiSumberAir === "Terbatas" &&
+    statusDurasi === STATUS_AMAN
+  ) {
+    return {
+      statusDurasi,
+      statusAkhir: STATUS_WASPADA,
+      alasan:
+        "Cadangan cukup >3 hari, namun sumber air utama sedang terbatas.",
+    };
+  }
+
+  return {
+    statusDurasi,
+    statusAkhir: statusDurasi,
+    alasan,
+  };
 }
 
-// 4. FUNGSI KALKULASI UTAMA (Dipanggil oleh Halaman Frontend Next.js)
+// 4. FUNGSI KALKULASI UTAMA
 export function hitungKetahananAir({
   jumlahAnggota,
   sumberAirUtama,
@@ -63,6 +105,7 @@ export function hitungKetahananAir({
   kapasitasTangkiLiter = null,
   persentaseIsi = null,
   luasAtapM2 = null,
+  curahHujanMm = null,
   kebutuhanMhm = false,
   jumlahAnggotaMhm = 0,
 }) {
@@ -70,9 +113,15 @@ export function hitungKetahananAir({
 
   // Validasi Input Wajib
   if (!isInt(jumlahAnggota) || jumlahAnggota <= 0) {
-    errors.push("Jumlah anggota keluarga harus berupa bilangan bulat > 0.");
+    errors.push(
+      "Jumlah anggota keluarga harus berupa bilangan bulat > 0."
+    );
   }
-  if (typeof sumberAirUtama !== "string" || !sumberAirUtama.trim()) {
+
+  if (
+    typeof sumberAirUtama !== "string" ||
+    !sumberAirUtama.trim()
+  ) {
     errors.push("Sumber air utama wajib diisi.");
   }
 
@@ -80,14 +129,27 @@ export function hitungKetahananAir({
   if (typeof kebutuhanMhm !== "boolean") {
     errors.push("kebutuhanMhm harus boolean.");
   }
+
   if (!isInt(jumlahAnggotaMhm) || jumlahAnggotaMhm < 0) {
     errors.push("Jumlah anggota MHM harus >= 0.");
-  } else if (isInt(jumlahAnggota) && jumlahAnggota > 0 && jumlahAnggotaMhm > jumlahAnggota) {
-    errors.push("Jumlah anggota MHM tidak boleh melebihi total anggota keluarga.");
+  } else if (
+    isInt(jumlahAnggota) &&
+    jumlahAnggota > 0 &&
+    jumlahAnggotaMhm > jumlahAnggota
+  ) {
+    errors.push(
+      "Jumlah anggota MHM tidak boleh melebihi total anggota keluarga."
+    );
   }
 
   // Validasi Kondisi Sumber Air
-  const pilihanKondisi = new Set(["Normal", "Terbatas", "Tidak berfungsi", "Belum diketahui"]);
+  const pilihanKondisi = new Set([
+    "Normal",
+    "Terbatas",
+    "Tidak berfungsi",
+    "Belum diketahui",
+  ]);
+
   if (!pilihanKondisi.has(kondisiSumberAir)) {
     errors.push("Kondisi sumber air tidak valid.");
   }
@@ -97,24 +159,53 @@ export function hitungKetahananAir({
   const pakaiVolumeAktual = volumeCadanganLiter !== null;
 
   if (pakaiVolumeAktual) {
-    if (!isAngka(volumeCadanganLiter) || volumeCadanganLiter < 0) {
+    if (
+      !isAngka(volumeCadanganLiter) ||
+      volumeCadanganLiter < 0
+    ) {
       errors.push("Volume cadangan aktual harus >= 0.");
     } else {
       cadangan = Number(volumeCadanganLiter);
     }
   } else {
-    if (!isAngka(kapasitasTangkiLiter) || kapasitasTangkiLiter <= 0) {
+    if (
+      !isAngka(kapasitasTangkiLiter) ||
+      kapasitasTangkiLiter <= 0
+    ) {
       errors.push("Kapasitas tangki harus > 0.");
     }
-    if (!isAngka(persentaseIsi) || persentaseIsi < 0 || persentaseIsi > 100) {
+
+    if (
+      !isAngka(persentaseIsi) ||
+      persentaseIsi < 0 ||
+      persentaseIsi > 100
+    ) {
       errors.push("Persentase isi tangki harus 0 - 100%.");
     }
+
     if (errors.length === 0) {
-      cadangan = Number(kapasitasTangkiLiter) * (Number(persentaseIsi) / 100);
+      cadangan =
+        Number(kapasitasTangkiLiter) *
+        (Number(persentaseIsi) / 100);
     }
   }
 
-  // JIKA TIDAK VALID -> RETURN BELUM DAPAT DITENTUKAN
+  // Validasi data panen hujan jika diisi.
+  if (
+    curahHujanMm !== null &&
+    (!isAngka(curahHujanMm) || curahHujanMm < 0)
+  ) {
+    errors.push("Data curah hujan tidak valid.");
+  }
+
+  if (
+    luasAtapM2 !== null &&
+    (!isAngka(luasAtapM2) || luasAtapM2 < 0)
+  ) {
+    errors.push("Luas atap tidak valid.");
+  }
+
+  // Jika tidak valid, hentikan perhitungan.
   if (errors.length > 0) {
     return {
       valid: false,
@@ -124,14 +215,27 @@ export function hitungKetahananAir({
     };
   }
 
-  // PERHITUNGAN UTAMA
-  const kebutuhanDasar = jumlahAnggota * KEBUTUHAN_PER_ORANG_LITER_HARI;
-  const tambahanMhm = kebutuhanMhm ? jumlahAnggotaMhm * TAMBAHAN_AIR_MHM_PER_ORANG_LITER_HARI : 0;
+  // Perhitungan utama
+  const kebutuhanDasar =
+    jumlahAnggota * KEBUTUHAN_PER_ORANG_LITER_HARI;
+
+  const tambahanMhm = kebutuhanMhm
+    ? jumlahAnggotaMhm * TAMBAHAN_AIR_MHM_PER_ORANG_LITER_HARI
+    : 0;
+
   const kebutuhanHarian = kebutuhanDasar + tambahanMhm;
   const durasi = cadangan / kebutuhanHarian;
-  const potensiPanenHujan = hitungPotensiPanenAirHujan(luasAtapM2);
 
-  const { statusDurasi, statusAkhir, alasan } = klasifikasikanStatus(durasi, kondisiSumberAir);
+  const potensiPanenHujan = hitungPotensiPanenAirHujan(
+    luasAtapM2,
+    curahHujanMm
+  );
+
+  const {
+    statusDurasi,
+    statusAkhir,
+    alasan,
+  } = klasifikasikanStatus(durasi, kondisiSumberAir);
 
   return {
     valid: true,

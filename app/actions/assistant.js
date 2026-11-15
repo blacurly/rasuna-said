@@ -1,5 +1,6 @@
 "use server";
 
+import { createClient } from "@/lib/supabase/server";
 import { jawabPertanyaanAssistant } from "@/services/assistantService";
 
 const BATAS_PERTANYAAN = 2000;
@@ -17,7 +18,6 @@ export async function kirimPesanAssistant({
   history = [],
 }) {
   try {
-    // Validasi pertanyaan.
     if (
       typeof question !== "string" ||
       !question.trim()
@@ -37,7 +37,6 @@ export async function kirimPesanAssistant({
       };
     }
 
-    // Batasi dan bersihkan riwayat percakapan.
     const riwayatBersih = Array.isArray(history)
       ? history
           .filter(
@@ -68,29 +67,29 @@ export async function kirimPesanAssistant({
       };
     }
 
-    // Pertahankan semua mode, termasuk hybrid.
     const mode = MODE_VALID.includes(hasil.mode)
       ? hasil.mode
       : "llm";
 
-    // Pertahankan metadata sumber untuk ditampilkan di frontend.
+    const answer =
+      typeof hasil.answer === "string"
+        ? hasil.answer
+        : "Maaf, AIRA belum dapat memberikan jawaban.";
+
     const sources = Array.isArray(hasil.sources)
       ? hasil.sources.map((source) => ({
           title:
             typeof source.title === "string"
               ? source.title
               : "Dokumen referensi AIRA",
-
           publisher:
             typeof source.publisher === "string"
               ? source.publisher
               : "",
-
           page_start:
             Number.isInteger(source.page_start)
               ? source.page_start
               : null,
-
           page_end:
             Number.isInteger(source.page_end)
               ? source.page_end
@@ -98,19 +97,55 @@ export async function kirimPesanAssistant({
         }))
       : [];
 
+    let historySaved = false;
+
+    try {
+      const supabase = await createClient();
+
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser();
+
+      if (!authError && user) {
+        const { error: saveError } = await supabase
+          .from("assistant_interactions")
+          .insert({
+            user_id: user.id,
+            household_id: null,
+            assessment_id: null,
+            guide_id: null,
+            user_question: pertanyaan,
+            assistant_response: answer,
+          });
+
+        if (saveError) {
+          console.error(
+            "[AIRA Assistant] Gagal menyimpan percakapan:",
+            saveError
+          );
+        } else {
+          historySaved = true;
+        }
+      }
+    } catch (saveError) {
+      console.error(
+        "[AIRA Assistant] Penyimpanan riwayat gagal:",
+        saveError
+      );
+    }
+
     return {
       ok: true,
-      answer:
-        typeof hasil.answer === "string"
-          ? hasil.answer
-          : "Maaf, AIRA belum dapat memberikan jawaban.",
+      answer,
       mode,
       sources,
+      historySaved,
     };
   } catch (error) {
     console.error(
       "[AIRA Assistant Action] Kesalahan:",
-      error.message
+      error
     );
 
     return {
