@@ -18,8 +18,10 @@ import Stepper from "@/components/kalkulator/Stepper";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-import { hitungKalkulator } from "@/app/actions/kalkulator";
-import { cariCurahHujan } from "@/data/curahHujan";
+import {
+  ambilCurahHujanLokasi,
+  hitungKalkulator,
+} from "@/app/actions/kalkulator";
 import {
   bacaDraftKalkulator,
   hapusDraftKalkulator,
@@ -65,14 +67,37 @@ export default function KalkulatorForm({ awal = null }) {
   const [loading, setLoading] = useState(false);
   const [gagal, setGagal] = useState("");
 
-  // "Hitung ulang" dari riwayat: draft di sessionStorage didahulukan dari data terakhir.
+  // Draft di sessionStorage didahulukan dari data terakhir di database. Draft dibuat oleh
+  // "Hitung ulang" (riwayat) dan oleh "Ubah Data Perhitungan" / "Lengkapi data panen hujan"
+  // (halaman hasil), supaya formulir terbuka dengan data yang terakhir diisi pengguna.
   useEffect(() => {
     const draft = bacaDraftKalkulator();
     if (!draft) return;
 
+    // sessionStorage hanya bisa dibaca di browser, jadi pemulihan dilakukan sekali setelah mount.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setValue({ ...INPUT_AWAL, ...draft });
     hapusDraftKalkulator();
   }, []);
+
+  // Curah hujan untuk keterangan pada card Potensi Panen Air Hujan.
+  // Diambil dari sumber yang sama dengan perhitungan akhir, begitu lokasi lengkap dipilih.
+  const [hujan, setHujan] = useState({ lokasi: "", mm: null });
+
+  useEffect(() => {
+    const lokasi = value.lokasi;
+    if (!lokasi) return;
+
+    let aktif = true;
+
+    ambilCurahHujanLokasi(lokasi).then((res) => {
+      if (aktif) setHujan({ lokasi, mm: res.ok ? res.curahHujanMmPerBulan : null });
+    });
+
+    return () => {
+      aktif = false;
+    };
+  }, [value.lokasi]);
 
   // ==========================================
   // PERUBAHAN INPUT
@@ -101,7 +126,9 @@ export default function KalkulatorForm({ awal = null }) {
   );
 
   const adaKapasitas = Number(value.kapasitas) > 0;
-  const curahHujan = cariCurahHujan(value.lokasi);
+  const hujanSiap = Boolean(value.lokasi) && hujan.lokasi === value.lokasi;
+  const hujanMemuat = Boolean(value.lokasi) && !hujanSiap;
+  const curahHujan = hujanSiap ? hujan.mm : null;
 
   // Format nama wilayah hanya untuk tampilan.
   // value.lokasi tetap menggunakan nilai aslinya.
@@ -628,14 +655,20 @@ export default function KalkulatorForm({ awal = null }) {
               <CloudRain className="mt-0.5 size-4 shrink-0 text-aira-primary" />
 
               <span>
-                {value.lokasi && curahHujan != null ? (
+                {!value.lokasi ? (
+                  <>Pilih lokasi untuk menghitung estimasi panen air hujan.</>
+                ) : hujanMemuat ? (
+                  <>Mengambil data curah hujan untuk lokasi Anda…</>
+                ) : curahHujan != null ? (
                   <>
                     Curah hujan dihitung otomatis dari lokasi Anda (
-                    <strong>{lokasiTampilan}</strong>, {curahHujan}{" "}
-                    mm/bulan, data simulasi).
+                    {lokasiTampilan}, {curahHujan} mm/bulan, data simulasi).
                   </>
                 ) : (
-                  <>Pilih lokasi untuk menghitung estimasi panen air hujan.</>
+                  <>
+                    Data curah hujan untuk lokasi ini belum tersedia, sehingga
+                    estimasi panen air hujan belum dapat dihitung.
+                  </>
                 )}
 
                 {luasAtap > 0 && curahHujan != null && (

@@ -1,4 +1,8 @@
+"use client";
+
 import Link from "next/link";
+
+import { salinHasilKeDraft } from "@/lib/hasilKalkulator";
 import {
   Bookmark,
   MapPinned,
@@ -34,7 +38,11 @@ export default function HasilActions({ statusKey }) {
 
       {statusKey === "belum" ? (
         <>
-          <Link href="/kalkulator-air" className={tombolUtama}>
+          <Link
+            href="/kalkulator-air"
+            onClick={() => salinHasilKeDraft()}
+            className={tombolUtama}
+          >
             <Pencil className="size-5" aria-hidden="true" />
             Periksa Kembali Data
           </Link>
@@ -71,6 +79,7 @@ export default function HasilActions({ statusKey }) {
 
       <Link
         href="/kalkulator-air"
+        onClick={() => salinHasilKeDraft()}
         className="inline-flex min-h-11 items-center justify-center gap-1.5 self-center px-2 text-sm font-medium text-aira-text/70 underline hover:text-aira-primary"
       >
         <Pencil className="size-4" aria-hidden="true" />
