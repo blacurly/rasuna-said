@@ -10,7 +10,7 @@ document_registry (Supabase)
     -> Save chunks to Supabase
 
 Environment variables:
-    SUPABASE_URL                  Wajib
+    NEXT_PUBLIC_SUPABASE_URL      Wajib
     SUPABASE_SERVICE_ROLE_KEY     Wajib
     FORCE_REPROCESS               true / false (default false)
     MAKS_DOKUMEN                  Angka positif atau kosong
@@ -53,11 +53,11 @@ def wajib(nama):
     return nilai
 
 
-SUPABASE_URL = wajib("SUPABASE_URL")
+NEXT_PUBLIC_SUPABASE_URL = wajib("NEXT_PUBLIC_SUPABASE_URL")
 SUPABASE_SERVICE_ROLE_KEY = wajib("SUPABASE_SERVICE_ROLE_KEY")
 
-if not SUPABASE_URL.startswith(("https://", "http://")):
-    sys.exit("❌ SUPABASE_URL harus berupa URL HTTP/HTTPS yang valid.")
+if not NEXT_PUBLIC_SUPABASE_URL.startswith(("https://", "http://")):
+    sys.exit("❌ NEXT_PUBLIC_SUPABASE_URL harus berupa URL HTTP/HTTPS yang valid.")
 
 
 FORCE_REPROCESS = (
@@ -125,7 +125,7 @@ print("🔌 Menghubungkan ke Supabase...")
 
 try:
     supabase = create_client(
-        SUPABASE_URL,
+        NEXT_PUBLIC_SUPABASE_URL,
         SUPABASE_SERVICE_ROLE_KEY
     )
 except Exception as e:
