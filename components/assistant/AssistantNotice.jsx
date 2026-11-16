@@ -7,50 +7,23 @@ export default function AssistantNotice() {
       role="note"
       aria-label="Disclaimer AIRA Assistant"
       className="
-        mt-3 flex w-full items-start gap-3
+        mt-5 flex w-full items-start gap-3
         rounded-2xl
-        border border-aira-primary/10
-        bg-aira-sand
-        px-4 py-3.5
-        sm:px-5 sm:py-4
+        bg-aira-sand/70
+        px-4 py-4
+        sm:px-5
       "
     >
-      {/* ICON INFORMASI */}
-      <div
-        className="
-          mt-0.5 flex size-7 shrink-0
-          items-center justify-center
-          rounded-full bg-white
-        "
-      >
-        <Info
-          className="size-4 text-aira-primary"
-          strokeWidth={2}
-        />
-      </div>
+      <Info
+        className="mt-0.5 size-4 shrink-0 text-aira-text/60"
+        strokeWidth={1.75}
+        aria-hidden="true"
+      />
 
-      {/* ISI DISCLAIMER */}
-      <div className="min-w-0 flex-1">
-        <h3
-          className="
-            mb-1 text-xs font-semibold
-            text-aira-primary
-            sm:text-sm
-          "
-        >
-          Informasi dan Disclaimer
-        </h3>
-
-        <p
-          className="
-            text-xs leading-relaxed
-            text-aira-text/75
-            sm:text-[13px]
-          "
-        >
-          {ASSISTANT_CONFIG.notice}
-        </p>
-      </div>
+      <p className="min-w-0 flex-1 text-xs leading-relaxed text-aira-text/70">
+        <span className="font-medium">Disclaimer:</span>{" "}
+        {ASSISTANT_CONFIG.notice}
+      </p>
     </aside>
   );
 } 
