@@ -4,6 +4,7 @@ import Link from "next/link";
 import { CloudRain, Gauge, Home, MapPin } from "lucide-react";
 
 import { formatLokasiWilayah } from "@/lib/formatWilayah";
+import { salinHasilKeDraft } from "@/lib/hasilKalkulator";
 import { KOEFISIEN_PANEN_AIR_HUJAN } from "@/services/calculatorService";
 
 const formatAngka = (angka) =>
@@ -155,6 +156,7 @@ export default function EstimasiPanenHujan({ hasil, masukan }) {
 
             <Link
               href="/kalkulator-air"
+              onClick={() => salinHasilKeDraft()}
               className="mt-2 inline-flex min-h-11 items-center text-sm font-bold text-aira-primary underline"
             >
               Lengkapi data panen hujan
