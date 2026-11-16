@@ -1,4 +1,3 @@
-
 export const INITIAL_MESSAGE = {
   id: "welcome",
   role: "assistant",
@@ -17,6 +16,7 @@ export const SUGGESTED_QUESTIONS = [
 
 export const ASSISTANT_CONFIG = {
   title: "AIRA Assistant",
+
   subtitle: "Siap membantu, tanpa perlu login",
 
   mode:
@@ -27,7 +27,7 @@ export const ASSISTANT_CONFIG = {
   initialLoadingText: "Mencari referensi AIRA...",
 
   notice:
-    "AIRA Assistant memberikan informasi edukatif seputar air, sanitasi, dan ketahanan iklim. Jawaban AI bukan pengganti pengujian kualitas air, informasi resmi, atau tenaga kesehatan.",
+    "Jawaban AIRA Assistant merupakan informasi edukatif yang dihasilkan dari referensi pengetahuan AIRA dan informasi umum yang tersedia secara daring. AI dapat memberikan informasi yang kurang tepat atau tidak sepenuhnya akurat. Gunakan jawaban sebagai referensi awal dan lakukan verifikasi melalui sumber resmi atau tenaga ahli terkait sebelum mengambil keputusan.", 
 };
 
 export const ASSISTANT_LINKS = [
@@ -41,4 +41,4 @@ export const ASSISTANT_LINKS = [
     href: "/navigasi-air",
     icon: "map",
   },
-];
+]; 
