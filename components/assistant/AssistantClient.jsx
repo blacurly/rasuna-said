@@ -20,16 +20,6 @@ export default function AssistantClient() {
     retryMessageSend,
   } = useAssistantChat();
 
-  // Memeriksa apakah AI sudah memberikan jawaban.
-  // Pesan pembuka (welcome) tidak dihitung.
-  const hasAssistantResponse = messages.some(
-    (message) =>
-      message.role === "assistant" &&
-      message.id !== "welcome" &&
-      typeof message.content === "string" &&
-      message.content.trim().length > 0
-  );
-
   return (
     <section className="w-full min-w-0 bg-aira-bg">
       <div
@@ -54,11 +44,6 @@ export default function AssistantClient() {
           endRef={endRef}
         />
 
-        {/* DISCLAIMER SETELAH AI MEMBERIKAN JAWABAN */}
-        {hasAssistantResponse && !loading && (
-          <AssistantNotice />
-        )}
-
         {/* INPUT PESAN */}
         <ChatInput
           value={input}
@@ -69,7 +54,10 @@ export default function AssistantClient() {
 
         {/* NAVIGASI FITUR */}
         <AssistantQuickLinks />
+
+        {/* DISCLAIMER (selalu tampil di bagian bawah) */}
+        <AssistantNotice />
       </div>
     </section>
   );
-}
+} 

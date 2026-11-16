@@ -27,7 +27,7 @@ export const ASSISTANT_CONFIG = {
   initialLoadingText: "Mencari referensi AIRA...",
 
   notice:
-    "Jawaban AIRA Assistant merupakan informasi edukatif yang dihasilkan dari referensi pengetahuan AIRA dan informasi umum yang tersedia secara daring. AI dapat memberikan informasi yang kurang tepat atau tidak sepenuhnya akurat. Gunakan jawaban sebagai referensi awal dan lakukan verifikasi melalui sumber resmi atau tenaga ahli terkait sebelum mengambil keputusan.", 
+    "Jawaban AIRA Assistant disusun dari referensi pengetahuan AIRA yang diadaptasi dari dokumen resmi dan panduan (antara lain Kementerian Kesehatan RI, Peraturan Pemerintah No. 122 Tahun 2015, WHO, UNICEF, dan Sphere Handbook) serta pengetahuan umum seputar air, sanitasi, dan ketahanan iklim. Informasi bersifat edukatif dan umum, tidak mengubah hasil kalkulator, dan bukan pengganti pengujian kualitas air, arahan otoritas setempat, atau tenaga kesehatan.",
 };
 
 export const ASSISTANT_LINKS = [
