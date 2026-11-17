@@ -134,7 +134,7 @@ export default function PenjelasanAira({
     <div aria-live="polite" className="space-y-3">
       {tahapTampilan === "memuat" && (
         <p
-          className="text-[15px] leading-relaxed text-aira-text/60"
+          className="text-aira-body leading-relaxed text-aira-text/60"
           role="status"
         >
           Menyiapkan penjelasan hasil perhitungan...
@@ -142,7 +142,7 @@ export default function PenjelasanAira({
       )}
 
       {tahapTampilan === "siap" && (
-        <p className="text-[15px] leading-relaxed text-aira-text/85">
+        <p className="text-aira-body leading-relaxed text-aira-text/85">
           {teksTampilan}
         </p>
       )}
