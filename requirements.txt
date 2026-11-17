@@ -1,6 +1,0 @@
---index-url https://pypi.org/simple
---extra-index-url https://download.pytorch.org/whl/cpu
-
-torch==2.7.1+cpu
-sentence-transformers>=3.0,<6.0
-numpy>=1.26,<3.0
