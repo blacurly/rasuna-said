@@ -29,16 +29,16 @@ load_dotenv(ENV_FILE, override=False)
 # KONFIGURASI SUPABASE
 # ==========================================
 
-SUPABASE_URL = (
-    os.getenv("SUPABASE_URL")
-    or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
+NEXT_PUBLIC_SUPABASE_URL = (
+    os.getenv("NEXT_PUBLIC_SUPABASE_URL")
+    or os.getenv("SUPABASE_URL")
 )
 
 SUPABASE_SERVICE_ROLE_KEY = os.getenv(
     "SUPABASE_SERVICE_ROLE_KEY"
 )
 
-if not SUPABASE_URL:
+if not NEXT_PUBLIC_SUPABASE_URL:
     raise ValueError(
         "NEXT_PUBLIC_SUPABASE_URL atau SUPABASE_URL "
         "belum ditemukan di .env.local"
@@ -67,7 +67,7 @@ print("=" * 55)
 print("\nMemuat koneksi Supabase...")
 
 supabase = create_client(
-    SUPABASE_URL,
+    NEXT_PUBLIC_SUPABASE_URL,
     SUPABASE_SERVICE_ROLE_KEY
 )
 

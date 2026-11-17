@@ -1,3 +1,4 @@
+
 import "server-only";
 
 import { createClient } from "@supabase/supabase-js";
@@ -108,12 +109,12 @@ const POLA_TOPIK_AIRA = [
 ];
 
 const POLA_SAPAAN = [
-  /^(halo|hai|hi|selamat pagi|selamat siang|selamat sore|selamat malam)(\s+aira)?[!. ]*$/i,
-  /^(terima kasih|makasih|thanks)[!. ]*$/i,
+  /^(halo|hai|hi|selamat pagi|selamat siang|selamat sore|selamat malam)(\s+aira)?[\s!.?]*$/i,
+  /^(terima kasih|makasih|thanks)[\s!.?]*$/i,
 ];
 
 function dalamRuangLingkup(pertanyaan) {
-  const teks = pertanyaan.trim();
+  const teks = String(pertanyaan || "").trim();
 
   if (POLA_SAPAAN.some((pola) => pola.test(teks))) {
     return true;
@@ -221,7 +222,6 @@ function ekstrakKataKunci(teks) {
 // 6. PENILAIAN RELEVANSI ISI CHUNK
 // ==================================================
 
-
 function hitungRelevansiIsi(pertanyaan, content) {
   const isi = normalisasiTeks(content);
   const pertanyaanNormal = normalisasiTeks(pertanyaan);
@@ -250,8 +250,6 @@ function hitungRelevansiIsi(pertanyaan, content) {
     );
 
   if (pertanyaanDefinisi) {
-    // Prioritaskan kalimat yang benar-benar mendefinisikan
-    // istilah yang sedang ditanyakan.
     const definisiAirMinum =
       /\bair minum\s+(adalah|merupakan|didefinisikan sebagai)\b/i.test(
         content
@@ -262,7 +260,10 @@ function hitungRelevansiIsi(pertanyaan, content) {
         content
       );
 
-    if (definisiAirMinum && /\bair minum\b/i.test(pertanyaan)) {
+    if (
+      definisiAirMinum &&
+      /\bair minum\b/i.test(pertanyaan)
+    ) {
       skor += 0.5;
     } else if (definisiUmum) {
       skor += 0.1;
@@ -378,10 +379,12 @@ async function cariDokumenRelevan(supabase, vector) {
 // ==================================================
 
 function ekstrakIdentitasPeraturan(pertanyaan) {
-  const teks = pertanyaan.replace(/\s+/g, " ");
+  const teks = String(pertanyaan || "")
+    .replace(/\s+/g, " ")
+    .trim();
 
   const pola =
-    /\b(?:pp|peraturan\s+pemerintah|permen(?:\s+[a-z]+)?|peraturan\s+menteri|uu|undang-undang)\b[^\d]{0,35}(?:(?:nomor|no\.?)\s*)?(\d{1,4})\s*(?:tahun|\/|[- ])\s*(\d{4})\b/i;
+    /\b(?:permenkes|permen(?:\s+[a-z]+)?|peraturan\s+menteri(?:\s+[a-z]+){0,5}|pp|peraturan\s+pemerintah|uu|undang-undang)\b[^\d]{0,100}(?:(?:nomor|no\.?)\s*)?(\d{1,4})\s*(?:tahun|\/|-)\s*(\d{4})\b/i;
 
   const cocok = teks.match(pola);
 
@@ -492,7 +495,9 @@ async function cariDokumenPeraturanSpesifik(
             _exactDocument: true,
           };
         })
-        .filter((chunk) => chunk._lexicalScore >= 0.15)
+        .filter(
+          (chunk) => chunk._lexicalScore >= 0.15
+        )
         .sort(
           (a, b) =>
             b._lexicalScore - a._lexicalScore ||
@@ -527,6 +532,7 @@ async function cariDokumenPeraturanSpesifik(
 function buatKunciChunk(item) {
   const documentId = item.document_id || "";
   const page = item.page_start ?? "";
+
   const content = normalisasiTeks(
     item.content || ""
   ).slice(0, 300);
@@ -555,7 +561,6 @@ function gabungkanHasilRetrieval(
     hasil.push(item);
   }
 
-  // Urutkan berdasarkan kekuatan bukti isi dan similarity.
   hasil.sort((a, b) => {
     const skorA = Math.max(
       Number(a._lexicalScore || 0),
@@ -823,13 +828,16 @@ async function panggilGemini({
 
   const isiPertanyaan = context
     ? `PERTANYAAN TERBARU PENGGUNA:
+
 ${question}
 
 KONTEKS DOKUMEN HASIL RETRIEVAL:
+
 ${context}
 
 Periksa isi setiap sumber dan tentukan mode berdasarkan kecukupan bukti.`
     : `PERTANYAAN TERBARU PENGGUNA:
+
 ${question}
 
 Tidak tersedia konteks dokumen yang cukup relevan. Gunakan mode llm.`;
@@ -1044,240 +1052,181 @@ ${String(item.content || "").slice(
 }
 
 // ==================================================
-// 21. PEMERIKSAAN SUMBER OTOMATIS
+// 21. RESPONS TIDAK DITEMUKAN DAN GANGGUAN AI
 // ==================================================
 
-// function cariSumberPendukungOtomatis(
-//   pertanyaan,
-//   potonganDokumen
-// ) {
-//   const pertanyaanDefinisi =
-//     /\b(apa yang dimaksud|pengertian|definisi|arti dari)\b/i.test(
-//       pertanyaan
-//     );
+const PESAN_GANGGUAN_AI =
+  "Maaf, AIRA Assistant sedang mengalami gangguan karena layanan AI belum tersedia. Silakan coba kembali beberapa saat lagi.";
 
-//   const kandidat = potonganDokumen
-//     .map((chunk, index) => {
-//       const skor = hitungRelevansiIsi(
-//         pertanyaan,
-//         chunk.content
-//       );
+function buatResponsTidakDitemukan() {
+  return {
+    ok: true,
+    answer: JAWABAN_TIDAK_DITEMUKAN,
+    mode: "no_source",
+    sources: [],
+  };
+}
 
-//       const isi = normalisasiTeks(chunk.content);
+function buatResponsGangguanAI() {
+  return {
+    ok: true,
+    answer: PESAN_GANGGUAN_AI,
+    mode: "llm",
+    sources: [],
+  };
+}
 
-//       const mengandungDefinisi =
-//         /\b(adalah|merupakan|didefinisikan sebagai|yang dimaksud dengan)\b/.test(
-//           isi
-//         );
+function buatResponsDenganSumber(
+  hasilAI,
+  nomorSumber,
+  potonganDokumen
+) {
+  const nomorValid = validasiNomorSumber(
+    nomorSumber,
+    potonganDokumen.length
+  );
 
-//       return {
-//         number: index + 1,
-//         score: skor,
-//         mengandungDefinisi,
-//       };
-//     })
-//     .filter((item) => {
-//       if (pertanyaanDefinisi) {
-//         return item.score >= 0.45 && item.mengandungDefinisi;
-//       }
+  if (nomorValid.length === 0) {
+    return null;
+  }
 
-//       return item.score >= 0.35;
-//     })
-//     .sort((a, b) => b.score - a.score);
+  const sources = nomorValid.map((number) =>
+    normalisasiSumber(
+      potonganDokumen[number - 1],
+      number
+    )
+  );
 
-//   return kandidat.slice(0, 3).map((item) => item.number);
-// }
+  return {
+    ok: true,
+    answer: hasilAI.answer,
+    mode: hasilAI.mode,
+    sources,
+  };
+}
 
 // ==================================================
 // 22. MENJAWAB DENGAN HYBRID RAG + LLM
 // ==================================================
 
-  const PESAN_GANGGUAN_AI =
-    "Maaf, AIRA Assistant sedang mengalami gangguan karena layanan AI belum tersedia. Silakan coba kembali beberapa saat lagi.";
+async function jawabDenganHybrid(
+  question,
+  history,
+  potonganDokumen
+) {
+  const memilikiKonteks =
+    Array.isArray(potonganDokumen) &&
+    potonganDokumen.length > 0;
 
-  function buatResponsTidakDitemukan() {
-    return {
-      ok: true,
-      answer: JAWABAN_TIDAK_DITEMUKAN,
-      mode: "rag",
-      sources: [],
-    };
-  }
+  const perluRujukan = membutuhkanRujukan(question);
 
-  function buatResponsGangguanAI() {
-    return {
-      ok: true,
-      answer: PESAN_GANGGUAN_AI,
-      mode: "llm",
-      sources: [],
-    };
-  }
+  // A. Pertanyaan resmi tanpa dokumen referensi.
 
-  function buatResponsDenganSumber(
-    hasilAI,
-    nomorSumber,
-    potonganDokumen
-  ) {
-    const nomorValid = validasiNomorSumber(
-      nomorSumber,
-      potonganDokumen.length
-    );
-
-    if (nomorValid.length === 0) {
-      return null;
-    }
-
-    const sources = nomorValid.map((number) =>
-      normalisasiSumber(
-        potonganDokumen[number - 1],
-        number
-      )
-    );
-
-    return {
-      ok: true,
-      answer: hasilAI.answer,
-      mode: hasilAI.mode,
-      sources,
-    };
-  }
-
-  async function jawabDenganHybrid(
-    question,
-    history,
-    potonganDokumen
-  ) {
-    const memilikiKonteks =
-      Array.isArray(potonganDokumen) &&
-      potonganDokumen.length > 0;
-
-    const perluRujukan = membutuhkanRujukan(question);
-
-    // --------------------------------------------------
-    // A. Pertanyaan resmi tanpa dokumen referensi
-    // --------------------------------------------------
-
-    if (!memilikiKonteks && perluRujukan) {
-      console.warn(
-        "[AIRA Assistant] Tidak ada dokumen untuk pertanyaan yang membutuhkan rujukan resmi."
-      );
-
-      return buatResponsTidakDitemukan();
-    }
-
-    const context = memilikiKonteks
-      ? buatKonteksDokumen(potonganDokumen)
-      : "";
-
-    // --------------------------------------------------
-    // B. Panggil Gemini dengan fallback antar-model
-    // --------------------------------------------------
-
-    let hasilAI;
-
-    try {
-      hasilAI = await panggilGemini({
-        systemPrompt: memilikiKonteks
-          ? SISTEM_HYBRID
-          : SISTEM_LLM,
-        question,
-        history,
-        context,
-      });
-    } catch (error) {
-      console.error(
-        "[AIRA Assistant] Semua percobaan Gemini untuk jawaban utama gagal:",
-        error.message
-      );
-
-      // Jangan memberikan jawaban umum untuk pertanyaan
-      // yang meminta kepastian peraturan atau informasi resmi.
-      if (perluRujukan) {
-        return buatResponsTidakDitemukan();
-      }
-
-      return buatResponsGangguanAI();
-    }
-
-    console.info(
-      "[AIRA Assistant] Mode Gemini:",
-      hasilAI.mode
-    );
-
-    // --------------------------------------------------
-    // C. Gemini memilih LLM
-    // --------------------------------------------------
-
-    if (hasilAI.mode === "llm") {
-      // Pertanyaan yang membutuhkan rujukan resmi tidak
-      // boleh dijawab menggunakan dugaan atau pengetahuan umum.
-      if (perluRujukan) {
-        return buatResponsTidakDitemukan();
-      }
-
-      // Jawaban LLM tidak boleh menampilkan sumber dokumen.
-      return {
-        ok: true,
-        answer: hasilAI.answer,
-        mode: "llm",
-        sources: [],
-      };
-    }
-
-    // --------------------------------------------------
-    // D. Gemini memilih RAG atau Hybrid
-    // --------------------------------------------------
-
-    const responsDenganSumber = buatResponsDenganSumber(
-      hasilAI,
-      hasilAI.source_numbers,
-      potonganDokumen
-    );
-
-    // Hanya gunakan sumber yang dipilih Gemini dan
-    // nomor sumbernya lolos validasi.
-    if (responsDenganSumber) {
-      return responsDenganSumber;
-    }
-
+  if (!memilikiKonteks && perluRujukan) {
     console.warn(
-      "[AIRA Assistant] Gemini memilih RAG/Hybrid tetapi tidak memberikan nomor sumber yang valid."
+      "[AIRA Assistant] Tidak ada dokumen untuk pertanyaan yang membutuhkan rujukan resmi."
     );
 
-    // --------------------------------------------------
-    // E. Tidak ada sumber valid
-    // --------------------------------------------------
+    return buatResponsTidakDitemukan();
+  }
+
+  const context = memilikiKonteks
+    ? buatKonteksDokumen(potonganDokumen)
+    : "";
+
+  // B. Panggil Gemini dengan fallback antar-model.
+
+  let hasilAI;
+
+  try {
+    hasilAI = await panggilGemini({
+      systemPrompt: memilikiKonteks
+        ? SISTEM_HYBRID
+        : SISTEM_LLM,
+      question,
+      history,
+      context,
+    });
+  } catch (error) {
+    console.error(
+      "[AIRA Assistant] Semua percobaan Gemini untuk jawaban utama gagal:",
+      error.message
+    );
 
     if (perluRujukan) {
       return buatResponsTidakDitemukan();
     }
 
-    // Untuk pertanyaan umum, coba jawab ulang tanpa dokumen.
-    // Hasilnya harus murni LLM dan tidak memiliki sitasi.
-    try {
-      const hasilLLM = await panggilGemini({
-        systemPrompt: SISTEM_LLM,
-        question,
-        history,
-        context: "",
-      });
-
-      return {
-        ok: true,
-        answer: hasilLLM.answer,
-        mode: "llm",
-        sources: [],
-      };
-    } catch (error) {
-      console.error(
-        "[AIRA Assistant] Fallback LLM gagal:",
-        error.message
-      );
-
-      return buatResponsGangguanAI();
-    }
+    return buatResponsGangguanAI();
   }
 
+  console.info(
+    "[AIRA Assistant] Mode Gemini:",
+    hasilAI.mode
+  );
+
+  // C. Gemini memilih LLM.
+
+  if (hasilAI.mode === "llm") {
+    if (perluRujukan) {
+      return buatResponsTidakDitemukan();
+    }
+
+    return {
+      ok: true,
+      answer: hasilAI.answer,
+      mode: "llm",
+      sources: [],
+    };
+  }
+
+  // D. Gemini memilih RAG atau Hybrid.
+
+  const responsDenganSumber = buatResponsDenganSumber(
+    hasilAI,
+    hasilAI.source_numbers,
+    potonganDokumen
+  );
+
+  if (responsDenganSumber) {
+    return responsDenganSumber;
+  }
+
+  console.warn(
+    "[AIRA Assistant] Gemini memilih RAG/Hybrid tetapi tidak memberikan nomor sumber yang valid."
+  );
+
+  // E. Tidak ada sumber valid.
+
+  if (perluRujukan) {
+    return buatResponsTidakDitemukan();
+  }
+
+  // Untuk pertanyaan umum, coba jawab ulang tanpa dokumen.
+
+  try {
+    const hasilLLM = await panggilGemini({
+      systemPrompt: SISTEM_LLM,
+      question,
+      history,
+      context: "",
+    });
+
+    return {
+      ok: true,
+      answer: hasilLLM.answer,
+      mode: "llm",
+      sources: [],
+    };
+  } catch (error) {
+    console.error(
+      "[AIRA Assistant] Fallback LLM gagal:",
+      error.message
+    );
+
+    return buatResponsGangguanAI();
+  }
+}
 
 // ==================================================
 // 23. FUNGSI UTAMA SERVER
@@ -1328,66 +1277,167 @@ export async function jawabPertanyaanAssistant({
     // C. Retrieval.
 
     let potonganDokumen = [];
-    let retrievalGagal = false;
+
+    let semantik = [];
+    let spesifik = [];
+
+    let embeddingBerhasil = false;
+    let retrievalSemantikBerhasil = false;
+    let pencarianSpesifikBerhasil = false;
+
+    const identitasPeraturan =
+      ekstrakIdentitasPeraturan(pertanyaan);
+
+    let supabase = null;
+
+    // C1. Inisialisasi Supabase.
 
     try {
-      const supabase = buatSupabaseServer();
-
-      const vector = await buatEmbedding(pertanyaan);
-
-      // Retrieval semantik dilakukan terlebih dahulu.
-      const semantik = await cariDokumenRelevan(
-        supabase,
-        vector
-      );
-
-      // Pencarian peraturan spesifik menerima hasil semantik
-      // agar chunk relevan dari dokumen yang sama tidak hilang.
-      const spesifik = await cariDokumenPeraturanSpesifik(
-        supabase,
-        pertanyaan,
-        semantik
-      );
-
-      potonganDokumen = gabungkanHasilRetrieval(
-        spesifik,
-        semantik
-      );
+      supabase = buatSupabaseServer();
 
       console.info(
-        "[AIRA Assistant] Ringkasan retrieval:",
-        {
-          semantik: semantik.length,
-          dokumenSpesifik: spesifik.length,
-          totalKonteks: potonganDokumen.length,
-          identitasPeraturan:
-            ekstrakIdentitasPeraturan(pertanyaan),
-        }
+        "[AIRA Retrieval] Koneksi Supabase berhasil diinisialisasi."
       );
+    } catch (error) {
+      console.error(
+        "[AIRA Retrieval] Inisialisasi Supabase gagal:",
+        error.message
+      );
+    }
 
-      if (potonganDokumen.length > 0) {
+    // C2. Embedding dan retrieval semantik.
+
+    if (supabase) {
+      let vector = null;
+
+      try {
+        vector = await buatEmbedding(pertanyaan);
+        embeddingBerhasil = true;
+
         console.info(
-          "[AIRA Assistant] Chunk yang ditemukan:",
-          potonganDokumen.map((item, index) => ({
-            nomor: index + 1,
-            title: item.title,
-            page_start: item.page_start,
-            page_end: item.page_end,
-            similarity: item.similarity,
-            lexicalScore: item._lexicalScore,
-            exactDocument: Boolean(item._exactDocument),
-            contentPreview: String(
-              item.content || ""
-            ).slice(0, 250),
-          }))
+          "[AIRA Retrieval] Embedding berhasil dibuat."
+        );
+      } catch (error) {
+        console.error(
+          "[AIRA Retrieval] Tahap Embedding API gagal:",
+          {
+            message: error.message,
+            cause: error.cause?.message || null,
+            code: error.cause?.code || error.code || null,
+          }
         );
       }
-    } catch (error) {
-      retrievalGagal = true;
 
-      console.error(
-        "[AIRA Assistant] Retrieval gagal:",
-        error.message
+      if (vector) {
+        try {
+          semantik = await cariDokumenRelevan(
+            supabase,
+            vector
+          );
+
+          retrievalSemantikBerhasil = true;
+
+          console.info(
+            "[AIRA Retrieval] Retrieval semantik berhasil:",
+            {
+              jumlahChunk: semantik.length,
+            }
+          );
+        } catch (error) {
+          console.error(
+            "[AIRA Retrieval] Tahap Supabase RPC gagal:",
+            {
+              message: error.message,
+              cause: error.cause?.message || null,
+              code: error.cause?.code || error.code || null,
+            }
+          );
+        }
+      }
+    }
+
+    // C3. Pencarian dokumen peraturan spesifik.
+    // Hanya dijalankan jika pertanyaan menyebut identitas peraturan.
+
+    if (supabase && identitasPeraturan) {
+      try {
+        console.info(
+          "[AIRA Retrieval] Memulai pencarian dokumen peraturan:",
+          identitasPeraturan
+        );
+
+        spesifik = await cariDokumenPeraturanSpesifik(
+          supabase,
+          pertanyaan,
+          semantik
+        );
+
+        pencarianSpesifikBerhasil = true;
+
+        console.info(
+          "[AIRA Retrieval] Pencarian dokumen spesifik selesai:",
+          {
+            jumlahChunk: spesifik.length,
+            identitasPeraturan,
+          }
+        );
+      } catch (error) {
+        console.error(
+          "[AIRA Retrieval] Pencarian dokumen spesifik gagal:",
+          {
+            message: error.message,
+            cause: error.cause?.message || null,
+            code: error.cause?.code || error.code || null,
+          }
+        );
+      }
+    } else {
+      console.info(
+        "[AIRA Retrieval] Tidak ada identitas peraturan spesifik pada pertanyaan."
+      );
+    }
+
+    // C4. Gabungkan hasil retrieval yang berhasil.
+
+    potonganDokumen = gabungkanHasilRetrieval(
+      spesifik,
+      semantik
+    );
+
+    const retrievalGagal =
+      !retrievalSemantikBerhasil &&
+      !pencarianSpesifikBerhasil;
+
+    console.info(
+      "[AIRA Assistant] Ringkasan retrieval:",
+      {
+        embeddingBerhasil,
+        retrievalSemantikBerhasil,
+        pencarianSpesifikBerhasil,
+        jumlahChunkSemantik: semantik.length,
+        jumlahChunkSpesifik: spesifik.length,
+        totalKonteks: potonganDokumen.length,
+        identitasPeraturan,
+        retrievalGagal,
+      }
+    );
+
+    if (potonganDokumen.length > 0) {
+      console.info(
+        "[AIRA Assistant] Chunk yang ditemukan:",
+        potonganDokumen.map((item, index) => ({
+          nomor: index + 1,
+          title: item.title || "Tidak tercantum",
+          page_start: item.page_start ?? null,
+          page_end: item.page_end ?? null,
+          similarity: item.similarity ?? null,
+          lexicalScore: item._lexicalScore ?? null,
+          exactDocument: Boolean(item._exactDocument),
+        }))
+      );
+    } else {
+      console.warn(
+        "[AIRA Retrieval] Tidak ditemukan chunk yang relevan."
       );
     }
 
@@ -1401,12 +1451,7 @@ export async function jawabPertanyaanAssistant({
         "[AIRA Assistant] Retrieval gagal untuk pertanyaan yang membutuhkan rujukan resmi."
       );
 
-      return {
-        ok: true,
-        answer: JAWABAN_TIDAK_DITEMUKAN,
-        mode: "rag",
-        sources: [],
-      };
+      return buatResponsTidakDitemukan();
     }
 
     if (retrievalGagal) {
