@@ -55,9 +55,9 @@ export default function AssistantClient() {
         {/* NAVIGASI FITUR */}
         <AssistantQuickLinks />
 
-        {/* INFORMASI */}
+        {/* DISCLAIMER (selalu tampil di bagian bawah) */}
         <AssistantNotice />
       </div>
     </section>
   );
-}
+} 

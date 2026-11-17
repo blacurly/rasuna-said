@@ -652,3 +652,31 @@ export async function hitungKalkulator(input) {
     dataCurahHujan,
   };
 }
+
+// ======================================================
+// PRATINJAU CURAH HUJAN UNTUK FORMULIR (A02)
+// ======================================================
+
+// Dipakai formulir untuk menampilkan keterangan curah hujan segera setelah
+// provinsi, kabupaten/kota, dan kecamatan dipilih. Sumber datanya sama dengan
+// perhitungan akhir (ambilRataRataCurahHujan), sehingga angka yang tampil di
+// formulir selalu sama dengan angka di halaman hasil.
+export async function ambilCurahHujanLokasi(lokasi) {
+  if (typeof lokasi !== "string" || !lokasi.trim()) {
+    return { ok: false, curahHujanMmPerBulan: null };
+  }
+
+  try {
+    const data = await ambilRataRataCurahHujan(lokasi.trim());
+    const mm = data?.curahHujanMmPerBulan;
+
+    if (typeof mm !== "number" || !Number.isFinite(mm)) {
+      return { ok: false, curahHujanMmPerBulan: null };
+    }
+
+    return { ok: true, curahHujanMmPerBulan: Math.round(mm) };
+  } catch (error) {
+    console.error("[AIRA] Pratinjau curah hujan gagal:", detailError(error));
+    return { ok: false, curahHujanMmPerBulan: null };
+  }
+}

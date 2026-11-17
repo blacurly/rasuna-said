@@ -90,7 +90,22 @@ function cocokDenganLokasi(tempat, lokasi) {
   );
 }
 
+// Mencari koordinat lokasi. Jika kecamatan tidak ditemukan di layanan geocoding,
+// dipakai kabupaten/kota dan provinsi (curah hujan bulanan tidak berbeda jauh
+// antar kecamatan dalam satu kabupaten/kota).
 async function cariKoordinat(lokasi) {
+  const langsung = await cariKoordinatLangsung(lokasi);
+  if (langsung) return langsung;
+
+  const bagian = pecahLokasi(lokasi);
+  if (bagian.length >= 3) {
+    return cariKoordinatLangsung(bagian.slice(1).join(", "));
+  }
+
+  return null;
+}
+
+async function cariKoordinatLangsung(lokasi) {
   const kandidat = buatKandidatPencarian(lokasi);
 
   for (const nama of kandidat) {

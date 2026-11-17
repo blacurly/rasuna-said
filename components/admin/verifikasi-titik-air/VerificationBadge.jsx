@@ -1,7 +1,14 @@
-import { CheckCircle2, Clock3, AlertCircle, XCircle, Droplets } from "lucide-react";
+import {
+  CheckCircle2,
+  Clock3,
+  AlertCircle,
+  XCircle,
+  Droplets,
+} from "lucide-react";
+import { formatAvailability } from "./formatters";
 
 const badgeBase =
-  "inline-flex w-fit items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium";
+  "inline-flex w-fit items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium leading-none";
 
 export function VerificationBadge({ status }) {
   const styles = {
@@ -23,6 +30,8 @@ export function VerificationBadge({ status }) {
 }
 
 export function AvailabilityBadge({ status }) {
+  const label = formatAvailability(status);
+
   const styles = {
     Tersedia: "bg-[#C8E9DF] text-[#286B59]",
     Terbatas: "bg-[#FCE8B5] text-[#87651D]",
@@ -30,9 +39,9 @@ export function AvailabilityBadge({ status }) {
   };
 
   return (
-    <span className={`${badgeBase} ${styles[status] || styles["Belum Diketahui"]}`}>
+    <span className={`${badgeBase} ${styles[label]}`}>
       <Droplets size={13} className="shrink-0" />
-      {status}
+      {label}
     </span>
   );
 } 
