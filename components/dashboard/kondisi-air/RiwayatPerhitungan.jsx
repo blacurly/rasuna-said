@@ -19,7 +19,8 @@ const teksMasukan = (r) =>
 const labelStatus = (status) => status.tampilan.label.split(" / ")[0];
 
 // `riwayat`: [{ ...catatan perhitungan, tanggalPenuh, status }] (status = hasil hitungStatusDashboard).
-export default function RiwayatPerhitungan({ riwayat }) {
+// `baru` = User Baru (belum ada catatan): hanya judul dan keterangan, tanpa kotak kosong.
+export default function RiwayatPerhitungan({ riwayat, baru = false }) {
   const router = useRouter();
 
   // "Hitung ulang": isi draft Kalkulator dengan data perhitungan ini, lalu buka Kalkulator.
@@ -44,10 +45,12 @@ export default function RiwayatPerhitungan({ riwayat }) {
     <section className="min-w-0 overflow-hidden rounded-[28px] border border-aira-primary/5 bg-white p-6 shadow-soft sm:p-8">
       <h2 className="text-xl font-semibold text-aira-primary">Riwayat perhitungan</h2>
       <p className="mt-1 text-sm text-aira-text/70">
-        Pilih &quot;Hitung ulang&quot; untuk membuka kalkulator dengan data yang sudah terisi.
+        {baru
+          ? "Belum ada riwayat pengisian kalkulator"
+          : 'Pilih "Hitung ulang" untuk membuka kalkulator dengan data yang sudah terisi.'}
       </p>
 
-      {riwayat.length === 0 ? (
+      {baru ? null : riwayat.length === 0 ? (
         <div className="mt-5 rounded-2xl bg-aira-bg p-8 text-center">
           <p className="font-semibold text-aira-primary">Belum ada riwayat perhitungan</p>
           <Link
