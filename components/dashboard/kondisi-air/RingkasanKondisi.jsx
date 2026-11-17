@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Calculator, Droplets } from "lucide-react";
+import { Calculator } from "lucide-react";
 
 import { formatDesimal } from "@/lib/statusDashboard";
 
@@ -46,23 +46,6 @@ export default function RingkasanKondisi({ status, catatan, keluarga, tanggalPen
         Perhitungan terakhir: {tanggalPanjang}, pukul {catatan.waktu}. Data berasal dari hasil yang disimpan, bukan
         pemantauan real-time.
       </p>
-    </section>
-  );
-}
-
-// Tampilan bila belum ada hasil kalkulator tersimpan.
-export function RingkasanKosong() {
-  return (
-    <section className="rounded-[28px] bg-white p-7 text-center shadow-soft">
-      <Droplets className="mx-auto size-10 text-aira-primary" />
-      <h2 className="mt-3 text-xl font-semibold text-aira-primary">Kondisi air belum tersedia</h2>
-      <p className="mt-2 text-aira-text/70">Belum ada hasil kalkulator yang tersimpan di akun ini.</p>
-      <Link
-        href="/kalkulator-air"
-        className="mt-5 inline-flex items-center gap-2 rounded-full bg-aira-primary px-6 py-3.5 font-semibold text-white transition-colors hover:bg-aira-primary-dark"
-      >
-        <Calculator className="size-4" /> Hitung kondisi air
-      </Link>
     </section>
   );
 }

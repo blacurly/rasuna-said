@@ -1,23 +1,21 @@
 import DashboardPageHead from "@/components/dashboard/DashboardPageHead";
 import ProfilKeluargaForm from "@/components/dashboard/kondisi-air/ProfilKeluargaForm";
-import RingkasanKondisi, {
-  RingkasanKosong,
-} from "@/components/dashboard/kondisi-air/RingkasanKondisi";
+import RingkasanKondisi from "@/components/dashboard/kondisi-air/RingkasanKondisi";
 import RiwayatPerhitungan from "@/components/dashboard/kondisi-air/RiwayatPerhitungan";
 
 import { ambilProfilDashboard } from "@/lib/dashboardProfile";
 import { hitungStatusDashboard } from "@/lib/statusDashboard";
 import { formatTanggalIso } from "@/lib/waktuDashboard";
 
-import { ambilDataDashboard } from "@/services/dashboardService";
+import { ambilDataDashboard, tanggalIsoWib, waktuWib } from "@/services/dashboardService";
 import { ambilRiwayatKalkulator } from "@/app/actions/riwayat";
 
 export const metadata = {
   title: "Kondisi Air Rumah Tangga - AIRA",
 };
 
-// B02 - Kondisi Air Rumah Tangga:
-// ringkasan, riwayat perhitungan, dan profil keluarga.
+// B02 - Kondisi Air Rumah Tangga: ringkasan, riwayat perhitungan, dan profil keluarga.
+// Dua versi: User Baru (belum ada catatan) dan User Lama (sudah ada catatan).
 export default async function KondisiAirRumahTanggaPage() {
   const profile = await ambilProfilDashboard();
 
@@ -65,13 +63,14 @@ export default async function KondisiAirRumahTanggaPage() {
 
     const liter = Number(r.available_water_liters ?? 0);
 
-    const tanggalRiwayat = formatTanggalIso(r.assessed_at);
+    // assessed_at berupa timestamp lengkap: ambil tanggal dan jam dalam zona WIB.
+    const tanggalRiwayat = formatTanggalIso(tanggalIsoWib(r.assessed_at));
 
     return {
       id: r.assessment_id,
 
       tanggalPenuh: tanggalRiwayat.tanggalPenuh,
-      waktu: tanggalRiwayat.waktu,
+      waktu: waktuWib(r.assessed_at),
 
       lokasi: masukan.lokasi || "",
       sumberAir: masukan.sumberAir || "",
@@ -97,12 +96,27 @@ export default async function KondisiAirRumahTanggaPage() {
     };
   });
 
-  const awalProfil = {
-    ...keluarga,
-    namaRumahTangga:
-      keluarga.namaRumahTangga ??
-      `Keluarga ${profile.full_name || "AIRA"}`,
-  };
+  // User Baru: belum ada catatan kondisi air (B02 versi User Baru).
+  const baru = !terbaru;
+
+  // Belum ada profil keluarga tersimpan: formulir dikosongkan agar placeholder tampil (sesuai Figma).
+  const profilKosong = keluarga.anggota == null;
+
+  const awalProfil = profilKosong
+    ? {
+        namaRumahTangga: "",
+        wilayahDesa: "",
+        anggota: "",
+        anggotaMhm: "",
+        sumberAirUtama: "",
+        kapasitasTandonLiter: "",
+      }
+    : {
+        ...keluarga,
+        namaRumahTangga:
+          keluarga.namaRumahTangga ??
+          (terbaru ? `Keluarga ${profile.full_name || "AIRA"}` : ""),
+      };
 
   return (
     <div className="space-y-6">
@@ -111,7 +125,8 @@ export default async function KondisiAirRumahTanggaPage() {
         desc="Ringkasan kondisi terkini, riwayat perhitungan, dan profil keluarga yang dipakai AIRA untuk menghitung."
       />
 
-      {terbaru && status ? (
+      {/* User Baru: kartu ringkasan tidak ditampilkan. */}
+      {terbaru && status && (
         <RingkasanKondisi
           status={status}
           catatan={terbaru}
@@ -119,13 +134,11 @@ export default async function KondisiAirRumahTanggaPage() {
           tanggalPenuh={tanggal.tanggalPenuh}
           tanggalPanjang={tanggal.tanggalPanjang}
         />
-      ) : (
-        <RingkasanKosong />
       )}
 
-      <RiwayatPerhitungan riwayat={baris} />
+      <RiwayatPerhitungan riwayat={baris} baru={baru} />
 
-      <ProfilKeluargaForm awal={awalProfil} />
+      <ProfilKeluargaForm awal={awalProfil} kosong={profilKosong} />
     </div>
   );
 }
