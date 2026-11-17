@@ -11,12 +11,23 @@ function isValidEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
+
 function getSiteUrl() {
-  return (
-    process.env.NEXT_PUBLIC_SITE_URL ||
-    "http://localhost:3000"
-  ).replace(/\/+$/, "");
+  const configuredUrl = process.env.NEXT_PUBLIC_SITE_URL;
+
+  if (configuredUrl) {
+    return configuredUrl.replace(/\/+$/, "");
+  }
+
+  // Fallback khusus production AIRA.
+  if (process.env.NODE_ENV === "production") {
+    return "https://aira-for-every-woman.vercel.app";
+  }
+
+  // Untuk pengembangan lokal.
+  return "http://localhost:3000";
 }
+
 
 function createCallbackUrl(nextPath) {
   const callbackUrl = new URL(

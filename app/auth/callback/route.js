@@ -1,12 +1,29 @@
+
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
+function getSiteUrl(requestUrl) {
+  const configuredUrl = process.env.NEXT_PUBLIC_SITE_URL;
+
+  if (configuredUrl) {
+    return configuredUrl.replace(/\/+$/, "");
+  }
+
+  if (process.env.NODE_ENV === "production") {
+    return "https://aira-for-every-woman.vercel.app";
+  }
+
+  return new URL(requestUrl).origin;
+}
+
 export async function GET(request) {
-  const url = new URL(request.url);
+  const requestUrl = new URL(request.url);
+  const siteUrl = getSiteUrl(request.url);
 
-  const code = url.searchParams.get("code");
-  const requestedNext = url.searchParams.get("next");
+  const code = requestUrl.searchParams.get("code");
+  const requestedNext = requestUrl.searchParams.get("next");
 
+  // Hanya izinkan tujuan internal berupa path.
   const safeNext =
     requestedNext &&
     requestedNext.startsWith("/") &&
@@ -22,14 +39,16 @@ export async function GET(request) {
     console.error("[AUTH CALLBACK] Kode tidak ditemukan");
 
     return NextResponse.redirect(
-      new URL("/masuk?error=invalid-link", url.origin)
+      new URL("/masuk?error=invalid-link", siteUrl)
     );
   }
 
   const supabase = await createClient();
 
-  const { error: exchangeError } =
-    await supabase.auth.exchangeCodeForSession(code);
+  const {
+    data,
+    error: exchangeError,
+  } = await supabase.auth.exchangeCodeForSession(code);
 
   if (exchangeError) {
     console.error(
@@ -38,30 +57,17 @@ export async function GET(request) {
     );
 
     return NextResponse.redirect(
-      new URL("/masuk?error=verification-failed", url.origin)
+      new URL("/masuk?error=verification-failed", siteUrl)
     );
   }
 
   console.log("[AUTH CALLBACK] Exchange berhasil");
-
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
   console.log(
     "[AUTH CALLBACK] User ditemukan:",
-    Boolean(user)
+    Boolean(data?.user)
   );
 
-  if (userError) {
-    console.error(
-      "[AUTH CALLBACK] Get user gagal:",
-      userError.message
-    );
-  }
-
   return NextResponse.redirect(
-    new URL(safeNext, url.origin)
+    new URL(safeNext, siteUrl)
   );
 }
