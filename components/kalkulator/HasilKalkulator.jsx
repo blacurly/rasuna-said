@@ -75,9 +75,12 @@ export default function HasilKalkulator() {
           {/* 2. Estimasi panen air hujan, selebar halaman. */}
           <EstimasiPanenHujan hasil={hasil} masukan={masukan} />
 
-          {/* 3. Kiri: langkah + disclaimer. Kanan: ringkasan input + aksi. */}
-          <div className="grid items-start gap-6 lg:grid-cols-[3fr_2fr]">
-            <div className="flex min-w-0 flex-col gap-6">
+          {/* 3. Kiri: langkah + disclaimer. Kanan: ringkasan input + aksi.
+              Kedua kolom dibuat sama tinggi: card "Langkah yang Disarankan" (kiri) dan
+              "Langkah Berikutnya" (kanan) memanjang mengisi sisa tinggi, jadi tepi bawah
+              disclaimer dan card kanan selalu sejajar berapa pun jumlah langkahnya. */}
+          <div className="grid gap-6 lg:grid-cols-[3fr_2fr]">
+            <div className="flex min-w-0 flex-col gap-6 [&>section:first-child]:flex-1">
               <RekomendasiCard
                 masukan={masukan}
                 hasil={hasil}
@@ -88,7 +91,7 @@ export default function HasilKalkulator() {
               <DisclaimerLangkah className="hidden lg:flex" />
             </div>
 
-            <div className="flex min-w-0 flex-col gap-6">
+            <div className="flex min-w-0 flex-col gap-6 [&>section:last-child]:flex-1">
               <RingkasanDataInput masukan={masukan} />
               <HasilActions statusKey={statusKey} />
             </div>

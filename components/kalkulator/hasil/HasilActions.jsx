@@ -72,7 +72,7 @@ export default function HasilActions({ statusKey }) {
         Simpan Hasil Kalkulator
       </Link>
 
-      <p className="text-center text-[13px] leading-relaxed text-aira-text/70">
+      <p className="mt-auto text-center text-[13px] leading-relaxed text-aira-text/70">
         Riwayat perhitungan memerlukan akun. Hasil saat ini tersimpan
         sementara di sesi browser.
       </p>
