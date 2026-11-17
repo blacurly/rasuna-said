@@ -14,18 +14,18 @@ export default function AdminSidebar({ admin }) {
   const pathname = usePathname();
 
   return (
-    <aside className="w-full min-w-0 space-y-4">
+    <aside className="w-full min-w-0 space-y-3">
       {/* Profil Admin */}
-      <div className="flex items-center gap-3 rounded-[20px] bg-white px-4 py-4 shadow-soft">
-        <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-aira-primary text-sm font-bold text-white">
+      <div className="flex items-center gap-2.5 rounded-[16px] bg-white px-3 py-3 shadow-soft">
+        <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-aira-primary text-xs font-bold text-white">
           {admin.initials}
         </div>
 
         <div className="min-w-0">
-          <p className="truncate text-sm font-semibold text-aira-text">
-            {admin.name || "Admin AIRA"}
+          <p className="truncate text-[13px] font-semibold leading-tight text-aira-text">
+            Admin AIRA
           </p>
-          <p className="mt-0.5 text-[11px] leading-tight text-aira-text/50">
+          <p className="mt-0.5 text-[11px] leading-tight text-aira-text/55">
             Peninjau & pengelola data
           </p>
         </div>
@@ -34,10 +34,11 @@ export default function AdminSidebar({ admin }) {
       {/* Navigasi Admin */}
       <nav
         aria-label="Navigasi admin"
-        className="flex flex-row gap-1 overflow-x-auto rounded-[20px] bg-white p-2.5 shadow-soft lg:flex-col lg:overflow-visible"
+        className="flex flex-row gap-1 overflow-x-auto rounded-[16px] bg-white p-2 shadow-soft lg:flex-col lg:overflow-visible"
       >
         {menuItems.map((item) => {
           const Icon = item.icon;
+
           const isActive =
             item.href === "/admin"
               ? pathname === "/admin"
@@ -48,7 +49,7 @@ export default function AdminSidebar({ admin }) {
               key={item.href}
               href={item.href}
               aria-current={isActive ? "page" : undefined}
-              className={`flex shrink-0 items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-semibold leading-snug transition-colors lg:shrink ${
+              className={`flex items-center gap-2.5 whitespace-nowrap rounded-[12px] px-3 py-2.5 text-[13px] font-semibold leading-tight transition-colors ${
                 isActive
                   ? "bg-aira-primary text-white"
                   : "text-aira-primary hover:bg-aira-sage/20"
@@ -62,4 +63,4 @@ export default function AdminSidebar({ admin }) {
       </nav>
     </aside>
   );
-}
+} 

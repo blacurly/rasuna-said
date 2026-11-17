@@ -166,14 +166,14 @@ export default function VerificationWorkspace() {
         <div
           className="
             w-full min-w-0
-            rounded-[16px]
+            rounded-[20px]
             border border-aira-primary/10
             bg-white
-            p-4
+            p-5 sm:p-6
             shadow-[0_5px_20px_rgba(23,107,120,0.08)]
           "
         >
-          <div className="mb-3">
+          <div className="mb-4">
             <VerificationTabs
               activeTab={activeTab}
               onTabChange={setActiveTab}

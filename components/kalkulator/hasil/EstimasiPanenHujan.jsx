@@ -4,6 +4,7 @@ import Link from "next/link";
 import { CloudRain, Gauge, Home, MapPin } from "lucide-react";
 
 import { formatLokasiWilayah } from "@/lib/formatWilayah";
+import { salinHasilKeDraft } from "@/lib/hasilKalkulator";
 import { KOEFISIEN_PANEN_AIR_HUJAN } from "@/services/calculatorService";
 
 const formatAngka = (angka) =>
@@ -105,7 +106,7 @@ export default function EstimasiPanenHujan({ hasil, masukan }) {
                 Dasar estimasi
               </p>
 
-              <ul className="mt-2 flex flex-1 flex-col divide-y divide-aira-primary/10 text-[15px] text-aira-text/80">
+              <ul className="mt-2 flex flex-1 flex-col divide-y divide-aira-primary/10 text-aira-body text-aira-text/80">
                 {dasarEstimasi.map((item) => (
                   <li
                     key={item.label}
@@ -130,7 +131,7 @@ export default function EstimasiPanenHujan({ hasil, masukan }) {
 
           <div className="mt-6 border-t border-aira-sage/60 pt-4">
             {wilayah && (
-              <p className="flex items-center gap-2 text-[15px] text-aira-text/80">
+              <p className="flex items-center gap-2 text-aira-body text-aira-text/80">
                 <MapPin
                   className="size-4 shrink-0 text-aira-primary"
                   aria-hidden="true"
@@ -146,7 +147,7 @@ export default function EstimasiPanenHujan({ hasil, masukan }) {
         </>
       ) : (
         <>
-          <div className="mt-5 rounded-2xl bg-white/80 px-4 py-4 text-[15px] leading-relaxed text-aira-text/80">
+          <div className="mt-5 rounded-2xl bg-white/80 px-4 py-4 text-aira-body leading-relaxed text-aira-text/80">
             <p>
               Estimasi panen air hujan belum dapat dihitung. Pilih lokasi dan
               isi luas atap rumah pada kalkulator untuk memperoleh
@@ -155,6 +156,7 @@ export default function EstimasiPanenHujan({ hasil, masukan }) {
 
             <Link
               href="/kalkulator-air"
+              onClick={() => salinHasilKeDraft()}
               className="mt-2 inline-flex min-h-11 items-center text-sm font-bold text-aira-primary underline"
             >
               Lengkapi data panen hujan

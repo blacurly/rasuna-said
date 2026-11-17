@@ -42,7 +42,7 @@ export default async function KelolaTitikAirPage() {
 
   return (
     <main className="min-h-screen w-full bg-aira-bg">
-      <div className="mx-auto w-full max-w-[1280px] px-5 py-6">
+      <div className="mx-auto w-full max-w-7xl px-5 py-6">
         <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[186px_minmax(0,1fr)]">
           <AdminSidebar admin={admin} />
 

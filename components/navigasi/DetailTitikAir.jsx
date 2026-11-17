@@ -65,20 +65,15 @@ export default function DetailTitikAir({ titik }) {
       label: "Peruntukan air",
       nilai: titik.usagePurpose || "Belum dikonfirmasi",
     },
-    {
-      Ikon: Database,
-      label: "Sumber informasi",
-      nilai: titik.source || "Belum diketahui",
-    },
   ];
 
   return (
     <div className="min-h-[calc(100vh-72px)] bg-aira-bg">
-      <div className="fade-up mx-auto max-w-[1100px] px-4 py-8 sm:px-5 sm:py-14">
+      <div className="fade-up mx-auto max-w-275 px-4 py-8 sm:px-5 sm:py-14">
         {/* Kembali ke daftar titik air */}
         <Link
           href="/navigasi-air"
-          className="inline-flex min-h-[44px] items-center gap-2 font-semibold text-aira-primary transition-all hover:gap-3"
+          className="inline-flex min-h-11 items-center gap-2 font-semibold text-aira-primary transition-all hover:gap-3"
         >
           <ArrowLeft className="size-5" />
           Kembali ke daftar
@@ -115,6 +110,66 @@ export default function DetailTitikAir({ titik }) {
             </p>
           </div>
         </header>
+
+        {/* Informasi wilayah administratif dipisahkan dari alamat bebas */}
+        <section
+          aria-labelledby="judul-wilayah"
+          className="mt-6 rounded-[28px] border border-aira-primary/5 bg-white p-6 shadow-soft sm:p-7"
+        >
+          <div className="flex items-center gap-3">
+            <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-aira-sage/40 text-aira-primary">
+              <MapPin className="size-5" />
+            </span>
+            <div>
+              <h2
+                id="judul-wilayah"
+                className="text-xl font-semibold text-aira-primary"
+              >
+                Informasi wilayah
+              </h2>
+              <p className="text-sm text-aira-text/65">
+                Wilayah administratif titik air
+              </p>
+            </div>
+          </div>
+
+          <dl className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {[
+              ["Desa / Kelurahan", titik.village],
+              ["Kecamatan", titik.kecamatan],
+              ["Kabupaten / Kota", titik.kabupaten],
+              ["Provinsi", titik.provinsi],
+            ].map(([label, value]) => (
+              <div
+                key={label}
+                className="min-w-0 rounded-2xl bg-aira-bg p-4"
+              >
+                <dt className="text-xs text-aira-text/60">{label}</dt>
+                <dd className="mt-1 wrap-break-word font-semibold text-aira-text">
+                  {value || "Belum tersedia"}
+                </dd>
+              </div>
+            ))}
+          </dl>
+
+          {titik.addressDetail && (
+            <div className="mt-4 rounded-2xl bg-aira-sand/70 p-4">
+              <p className="text-xs text-aira-text/60">
+                Alamat / keterangan tambahan
+              </p>
+              <p className="mt-1 text-sm font-medium text-aira-text">
+                {titik.addressDetail}
+              </p>
+            </div>
+          )}
+
+          {!titik.hasAdministrativeData && (
+            <p className="mt-4 rounded-xl border border-aira-warning-line bg-aira-warning p-3 text-sm text-aira-warning-text">
+              Data wilayah administratif belum lengkap. Informasi lokasi
+              perlu diperiksa oleh pengelola.
+            </p>
+          )}
+        </section>
 
         <div className="mt-6 grid gap-6 lg:grid-cols-12">
           {/* Kolom informasi dan status */}
@@ -173,10 +228,48 @@ export default function DetailTitikAir({ titik }) {
               </ul>
 
               {titik.note && (
-                <p className="mt-2 rounded-2xl bg-aira-sand p-4 text-[15px] leading-relaxed">
-                  {titik.note}
-                </p>
+                <div className="mt-4 rounded-2xl bg-aira-sand p-4">
+                  <p className="text-xs font-semibold text-aira-text/60">
+                    Keterangan
+                  </p>
+                  <p className="mt-1 text-aira-body leading-relaxed">
+                    {titik.note}
+                  </p>
+                </div>
               )}
+
+              {/* Metadata sumber ditampilkan terstruktur, bukan satu paragraf mentah */}
+              <div className="mt-5 rounded-2xl border border-aira-primary/10 p-4">
+                <div className="flex items-center gap-2">
+                  <Database className="size-5 text-aira-primary" />
+                  <h3 className="font-semibold text-aira-primary">
+                    Sumber informasi
+                  </h3>
+                </div>
+
+                <p className="mt-2 text-sm text-aira-text/80">
+                  {titik.source || "Sumber informasi belum tersedia"}
+                </p>
+
+                {Array.isArray(titik.sourceMetadata) &&
+                  titik.sourceMetadata.length > 0 && (
+                    <dl className="mt-3 space-y-2">
+                      {titik.sourceMetadata.map((item, index) => (
+                        <div
+                          key={`${item.label}-${index}`}
+                          className="grid gap-1 border-t border-aira-primary/10 pt-2 sm:grid-cols-[150px_1fr]"
+                        >
+                          <dt className="text-xs text-aira-text/60">
+                            {item.label}
+                          </dt>
+                          <dd className="wrap-break-word text-sm font-medium text-aira-text">
+                            {item.value}
+                          </dd>
+                        </div>
+                      ))}
+                    </dl>
+                  )}
+              </div>
             </div>
 
             {/* Peringatan informasi */}
@@ -201,7 +294,7 @@ export default function DetailTitikAir({ titik }) {
                 Menuju lokasi
               </h2>
 
-              <p className="mt-2 text-[15px] text-white/80">
+              <p className="mt-2 text-aira-body text-white/80">
                 Rute dibuka di aplikasi Google Maps pada tab baru.
               </p>
 
@@ -211,7 +304,7 @@ export default function DetailTitikAir({ titik }) {
                     href={maps.href}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="mt-5 flex min-h-[56px] items-center justify-center gap-2 rounded-full bg-aira-peach px-6 py-4 text-lg font-bold text-[#3b1409] transition hover:brightness-105"
+                    className="mt-5 flex min-h-14 items-center justify-center gap-2 rounded-full bg-aira-peach px-6 py-4 text-lg font-bold text-aira-danger-link transition hover:brightness-105"
                   >
                     <Navigation className="size-5" />
                     Buka di Google Maps
@@ -250,7 +343,7 @@ export default function DetailTitikAir({ titik }) {
                       {titik.provider || "Belum diketahui"}
                     </p>
 
-                    <p className="text-[15px] text-aira-text/80">
+                    <p className="text-aira-body text-aira-text/80">
                       {titik.contact || "Informasi belum tersedia"}
                     </p>
                   </div>
@@ -259,7 +352,7 @@ export default function DetailTitikAir({ titik }) {
                 {titik.phone ? (
                   <a
                     href={`tel:${titik.phone.replace(/-/g, "")}`}
-                    className="flex min-h-[52px] items-center justify-center gap-2 rounded-full border-2 border-aira-primary px-6 py-3.5 font-semibold text-aira-primary transition-colors hover:bg-aira-primary/10"
+                    className="flex min-h-13 items-center justify-center gap-2 rounded-full border-2 border-aira-primary px-6 py-3.5 font-semibold text-aira-primary transition-colors hover:bg-aira-primary/10"
                   >
                     <Phone className="size-5" />
                     {titik.phone}
@@ -277,7 +370,7 @@ export default function DetailTitikAir({ titik }) {
             {/* AIRA Assistant */}
             <Link
               href="/assistant"
-              className="flex min-h-[54px] w-full items-center justify-center gap-2 rounded-full bg-aira-sand px-6 py-4 font-semibold text-aira-primary transition-colors hover:bg-aira-sand-border"
+              className="flex min-h-13.5 w-full items-center justify-center gap-2 rounded-full bg-aira-sand px-6 py-4 font-semibold text-aira-primary transition-colors hover:bg-aira-sand-border"
             >
               <MessageCircleHeart className="size-5" />
               Tanya AIRA Assistant

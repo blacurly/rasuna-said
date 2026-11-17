@@ -408,7 +408,7 @@ async function simpanRiwayatKalkulator({
 // 5. SERVER ACTION KALKULATOR AIRA
 // ======================================================
 
-export async function hitungKalkulator(input) {
+export async function hitungKalkulator(input, options = {}) {
   console.log(
     "[AIRA] ========================================"
   );
@@ -558,11 +558,18 @@ export async function hitungKalkulator(input) {
   }
 
   // 5. Status awal penyimpanan.
+  // Form kalkulator utama menyimpan household + assessment melalui RPC
+  // save_water_assessment. Karena itu, pemanggil form mengirim
+  // { simpanRiwayat: false } agar tidak membuat assessment kedua.
+  // Endpoint API lama tetap dapat memakai penyimpanan server default.
   let penyimpanan = {
     saved: false,
-    reason: "guest",
+    reason: options?.simpanRiwayat === false
+      ? "delegated_to_household_rpc"
+      : "guest",
   };
 
+  if (options?.simpanRiwayat !== false) {
   // 6. Periksa sesi pengguna.
   try {
     const supabase = await createClient();
@@ -623,6 +630,7 @@ export async function hitungKalkulator(input) {
       code: error.code ?? null,
     };
   }
+  } // akhir if (options.simpanRiwayat !== false)
 
   // 7. Log hasil akhir.
   console.log(
@@ -651,4 +659,103 @@ export async function hitungKalkulator(input) {
     penyimpanan,
     dataCurahHujan,
   };
+}
+
+// ======================================================
+// MENYIMPAN REKOMENDASI KE ASSESSMENT DARI RPC HOUSEHOLD
+// ======================================================
+
+export async function simpanRekomendasiAssessment(assessmentIdInput, items) {
+  const assessmentId = Number(assessmentIdInput);
+
+  if (!Number.isSafeInteger(assessmentId) || assessmentId <= 0) {
+    return { saved: false, reason: "invalid_assessment_id" };
+  }
+
+  const daftarRekomendasi = normalisasiRekomendasi(items);
+
+  if (daftarRekomendasi.length === 0) {
+    return { saved: true, recommendationCount: 0, reason: "no_recommendations" };
+  }
+
+  const supabase = await createClient();
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    return { saved: false, reason: "unauthenticated" };
+  }
+
+  // Pastikan assessment memang milik pengguna yang sedang login.
+  const { data: assessment, error: assessmentError } = await supabase
+    .from("water_assessments")
+    .select("assessment_id")
+    .eq("assessment_id", assessmentId)
+    .eq("assessed_by_user_id", user.id)
+    .maybeSingle();
+
+  if (assessmentError) throw assessmentError;
+  if (!assessment) {
+    return { saved: false, reason: "assessment_not_owned_or_not_found" };
+  }
+
+  // Idempotensi: jika rekomendasi untuk assessment ini sudah ada, jangan insert ulang.
+  const { data: existing, error: existingError } = await supabase
+    .from("assessment_recommendations")
+    .select("recommendation_id")
+    .eq("assessment_id", assessmentId)
+    .limit(1);
+
+  if (existingError) throw existingError;
+  if (existing?.length) {
+    return {
+      saved: true,
+      alreadySaved: true,
+      recommendationCount: existing.length,
+    };
+  }
+
+  const rows = daftarRekomendasi.map((item) => ({
+    assessment_id: assessmentId,
+    guide_id: item.guide_id,
+    recommendation_title: item.recommendation_title,
+    recommendation_detail: item.recommendation_detail,
+    priority: item.priority,
+    action_status: "pending",
+  }));
+
+  const { error: insertError } = await supabase
+    .from("assessment_recommendations")
+    .insert(rows);
+
+  if (insertError) throw insertError;
+
+  return { saved: true, recommendationCount: rows.length };
+}
+
+// ======================================================
+// PRATINJAU CURAH HUJAN UNTUK FORMULIR (A02)
+// ======================================================
+
+// Dipakai formulir untuk menampilkan keterangan curah hujan segera setelah
+// provinsi, kabupaten/kota, dan kecamatan dipilih. Sumber datanya sama dengan
+// perhitungan akhir (ambilRataRataCurahHujan), sehingga angka yang tampil di
+// formulir selalu sama dengan angka di halaman hasil.
+export async function ambilCurahHujanLokasi(lokasi) {
+  if (typeof lokasi !== "string" || !lokasi.trim()) {
+    return { ok: false, curahHujanMmPerBulan: null };
+  }
+
+  try {
+    const data = await ambilRataRataCurahHujan(lokasi.trim());
+    const mm = data?.curahHujanMmPerBulan;
+
+    if (typeof mm !== "number" || !Number.isFinite(mm)) {
+      return { ok: false, curahHujanMmPerBulan: null };
+    }
+
+    return { ok: true, curahHujanMmPerBulan: Math.round(mm) };
+  } catch (error) {
+    console.error("[AIRA] Pratinjau curah hujan gagal:", detailError(error));
+    return { ok: false, curahHujanMmPerBulan: null };
+  }
 }

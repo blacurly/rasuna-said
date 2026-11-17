@@ -18,8 +18,11 @@ import Stepper from "@/components/kalkulator/Stepper";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-import { hitungKalkulator } from "@/app/actions/kalkulator";
-import { cariCurahHujan } from "@/data/curahHujan";
+import {
+  ambilCurahHujanLokasi,
+  hitungKalkulator,
+  simpanRekomendasiAssessment,
+} from "@/app/actions/kalkulator";
 import {
   bacaDraftKalkulator,
   hapusDraftKalkulator,
@@ -65,14 +68,37 @@ export default function KalkulatorForm({ awal = null }) {
   const [loading, setLoading] = useState(false);
   const [gagal, setGagal] = useState("");
 
-  // "Hitung ulang" dari riwayat: draft di sessionStorage didahulukan dari data terakhir.
+  // Draft di sessionStorage didahulukan dari data terakhir di database. Draft dibuat oleh
+  // "Hitung ulang" (riwayat) dan oleh "Ubah Data Perhitungan" / "Lengkapi data panen hujan"
+  // (halaman hasil), supaya formulir terbuka dengan data yang terakhir diisi pengguna.
   useEffect(() => {
     const draft = bacaDraftKalkulator();
     if (!draft) return;
 
+    // sessionStorage hanya bisa dibaca di browser, jadi pemulihan dilakukan sekali setelah mount.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setValue({ ...INPUT_AWAL, ...draft });
     hapusDraftKalkulator();
   }, []);
+
+  // Curah hujan untuk keterangan pada card Potensi Panen Air Hujan.
+  // Diambil dari sumber yang sama dengan perhitungan akhir, begitu lokasi lengkap dipilih.
+  const [hujan, setHujan] = useState({ lokasi: "", mm: null });
+
+  useEffect(() => {
+    const lokasi = value.lokasi;
+    if (!lokasi) return;
+
+    let aktif = true;
+
+    ambilCurahHujanLokasi(lokasi).then((res) => {
+      if (aktif) setHujan({ lokasi, mm: res.ok ? res.curahHujanMmPerBulan : null });
+    });
+
+    return () => {
+      aktif = false;
+    };
+  }, [value.lokasi]);
 
   // ==========================================
   // PERUBAHAN INPUT
@@ -101,7 +127,9 @@ export default function KalkulatorForm({ awal = null }) {
   );
 
   const adaKapasitas = Number(value.kapasitas) > 0;
-  const curahHujan = cariCurahHujan(value.lokasi);
+  const hujanSiap = Boolean(value.lokasi) && hujan.lokasi === value.lokasi;
+  const hujanMemuat = Boolean(value.lokasi) && !hujanSiap;
+  const curahHujan = hujanSiap ? hujan.mm : null;
 
   // Format nama wilayah hanya untuk tampilan.
   // value.lokasi tetap menggunakan nilai aslinya.
@@ -224,9 +252,57 @@ export default function KalkulatorForm({ awal = null }) {
       );
     }
 
-    console.log("[AIRA] Penyimpanan berhasil:", data);
+    // RPC save_water_assessment adalah SATU-SATUNYA jalur penyimpanan
+    // household + water_assessments untuk submit formulir ini.
+    // Ambil ID assessment dari hasil RPC, lalu hubungkan rekomendasi ke ID yang sama.
+    const rpcResult = Array.isArray(data) ? data[0] : data;
+    const assessmentId = Number(
+      rpcResult?.assessment_id ??
+      rpcResult?.assessmentId ??
+      rpcResult?.assessment?.assessment_id ??
+      rpcResult?.data?.assessment_id
+    );
 
-    return data;
+    let recommendationSave = {
+      saved: false,
+      reason: "assessment_id_not_returned_by_rpc",
+    };
+
+    if (Number.isSafeInteger(assessmentId) && assessmentId > 0) {
+      try {
+        recommendationSave = await simpanRekomendasiAssessment(
+          assessmentId,
+          hasil?.rekomendasi?.items ?? []
+        );
+      } catch (recommendationError) {
+        console.error(
+          "[AIRA] Assessment tersimpan, tetapi rekomendasi gagal disimpan:",
+          recommendationError
+        );
+        recommendationSave = {
+          saved: false,
+          reason: "recommendation_save_failed",
+          error: recommendationError?.message,
+        };
+      }
+    } else {
+      console.error(
+        "[AIRA] RPC berhasil tetapi tidak mengembalikan assessment_id. Periksa return value save_water_assessment.",
+        data
+      );
+    }
+
+    const hasilSimpan = {
+      ...rpcResult,
+      assessment_id: Number.isSafeInteger(assessmentId) && assessmentId > 0
+        ? assessmentId
+        : null,
+      recommendation_save: recommendationSave,
+    };
+
+    console.log("[AIRA] Penyimpanan household + assessment:", hasilSimpan);
+
+    return hasilSimpan;
   }
 
   // ==========================================
@@ -252,7 +328,9 @@ export default function KalkulatorForm({ awal = null }) {
 
     try {
       // 1. Jalankan perhitungan.
-      const hasil = await hitungKalkulator(value);
+      // Jangan simpan assessment dari Server Action di jalur ini.
+      // RPC di simpanKeSupabase menyimpan satu assessment yang memiliki household_id.
+      const hasil = await hitungKalkulator(value, { simpanRiwayat: false });
 
       if (!hasil.valid) {
         setGagal(
@@ -381,7 +459,7 @@ export default function KalkulatorForm({ awal = null }) {
               role="radiogroup"
               aria-label="Kondisi sumber air"
             >
-              <span className="mb-2 block text-[15px] font-semibold">
+              <span className="mb-2 block text-aira-body font-semibold">
                 Kondisi Sumber Air
               </span>
 
@@ -452,7 +530,7 @@ export default function KalkulatorForm({ awal = null }) {
 
             <div>
               <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                <span className="flex items-center gap-2 text-[15px] font-semibold">
+                <span className="flex items-center gap-2 text-aira-body font-semibold">
                   <Droplet className="size-4 text-aira-secondary" />
                   Volume Air Saat Ini
                 </span>
@@ -497,7 +575,7 @@ export default function KalkulatorForm({ awal = null }) {
           <div className="rounded-2xl bg-aira-sand p-5">
             <div className="flex items-start gap-4">
               <div className="flex-1">
-                <p className="text-[15px] font-semibold">
+                <p className="text-aira-body font-semibold">
                   Kebutuhan Kebersihan Menstruasi (MHM){" "}
                   <span className="ml-1 rounded-full bg-white px-2 py-0.5 text-xs font-medium text-aira-text/70">
                     Opsional
@@ -532,7 +610,7 @@ export default function KalkulatorForm({ awal = null }) {
 
             {value.mhm && (
               <div className="mt-5 flex flex-wrap items-center justify-between gap-4 border-t border-aira-text/10 pt-5">
-                <span className="max-w-75 text-[15px] font-medium">
+                <span className="max-w-75 text-aira-body font-medium">
                   Jumlah anggota keluarga yang sedang mengalami menstruasi
                 </span>
 
@@ -628,14 +706,20 @@ export default function KalkulatorForm({ awal = null }) {
               <CloudRain className="mt-0.5 size-4 shrink-0 text-aira-primary" />
 
               <span>
-                {value.lokasi && curahHujan != null ? (
+                {!value.lokasi ? (
+                  <>Pilih lokasi untuk menghitung estimasi panen air hujan.</>
+                ) : hujanMemuat ? (
+                  <>Mengambil data curah hujan untuk lokasi Anda…</>
+                ) : curahHujan != null ? (
                   <>
                     Curah hujan dihitung otomatis dari lokasi Anda (
-                    <strong>{lokasiTampilan}</strong>, {curahHujan}{" "}
-                    mm/bulan, data simulasi).
+                    {lokasiTampilan}, {curahHujan} mm/bulan, data simulasi).
                   </>
                 ) : (
-                  <>Pilih lokasi untuk menghitung estimasi panen air hujan.</>
+                  <>
+                    Data curah hujan untuk lokasi ini belum tersedia, sehingga
+                    estimasi panen air hujan belum dapat dihitung.
+                  </>
                 )}
 
                 {luasAtap > 0 && curahHujan != null && (
