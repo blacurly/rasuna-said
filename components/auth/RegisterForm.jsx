@@ -27,7 +27,6 @@ export default function RegisterForm() {
   const [notice, setNotice] = useState(null);
   const [isPending, startTransition] = useTransition();
 
-  // STATE MODAL KETENTUAN DAN PRIVASI
   const [dialogOpen, setDialogOpen] = useState(false);
   const [activeDocument, setActiveDocument] = useState("terms");
 
@@ -47,7 +46,6 @@ export default function RegisterForm() {
     setNotice(null);
   };
 
-  // MEMBUKA DOKUMEN SESUAI PILIHAN PENGGUNA
   const openDocument = (document) => {
     setActiveDocument(document);
     setDialogOpen(true);
@@ -60,6 +58,8 @@ export default function RegisterForm() {
       newErrors.nama = "Nama lengkap wajib diisi.";
     } else if (formData.nama.trim().length < 3) {
       newErrors.nama = "Nama minimal 3 karakter.";
+    } else if (formData.nama.trim().length > 150) {
+      newErrors.nama = "Nama maksimal 150 karakter.";
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -109,21 +109,19 @@ export default function RegisterForm() {
     e.preventDefault();
     setNotice(null);
 
-    // VALIDASI FRONTEND
     if (!validateForm()) {
       setNotice({
         type: "error",
         text: "Periksa kembali data yang kamu masukkan.",
       });
-
       return;
     }
 
-    // FORMAT DATA UNTUK SERVER ACTION
     const payload = new FormData();
 
-    payload.append("full_name", formData.nama);
-    payload.append("email", formData.email);
+    payload.append("full_name", formData.nama.trim());
+    payload.append("email", formData.email.trim());
+    payload.append("phone_number", formData.whatsapp.trim());
     payload.append("password", formData.password);
     payload.append(
       "confirm_password",
@@ -134,7 +132,6 @@ export default function RegisterForm() {
       payload.append("agreement", "on");
     }
 
-    // PROSES REGISTRASI SUPABASE
     startTransition(async () => {
       try {
         const res = await register(payload);
@@ -149,6 +146,7 @@ export default function RegisterForm() {
             type: "success",
             text: res.success,
           });
+          setFormData(initialForm);
         }
       } catch (error) {
         console.error("REGISTER FORM ERROR:", error);
@@ -168,7 +166,6 @@ export default function RegisterForm() {
         onSubmit={handleSubmit}
         className="mt-7 space-y-5"
       >
-        {/* NAMA LENGKAP */}
         <FormField
           icon={UserRound}
           label="Nama lengkap"
@@ -181,7 +178,6 @@ export default function RegisterForm() {
           error={errors.nama}
         />
 
-        {/* EMAIL */}
         <FormField
           icon={Mail}
           label="Email"
@@ -194,7 +190,6 @@ export default function RegisterForm() {
           error={errors.email}
         />
 
-        {/* WHATSAPP */}
         <FormField
           icon={Phone}
           label="Nomor WhatsApp"
@@ -208,7 +203,6 @@ export default function RegisterForm() {
           error={errors.whatsapp}
         />
 
-        {/* PASSWORD */}
         <PasswordField
           autoComplete="new-password"
           name="password"
@@ -217,7 +211,6 @@ export default function RegisterForm() {
           error={errors.password}
         />
 
-        {/* KONFIRMASI PASSWORD */}
         <PasswordField
           label="Konfirmasi kata sandi"
           name="konfirmasiPassword"
@@ -227,7 +220,6 @@ export default function RegisterForm() {
           error={errors.konfirmasiPassword}
         />
 
-        {/* PERSETUJUAN */}
         <div>
           <label className="flex min-h-11 items-start gap-2 text-sm text-aira-text">
             <input
@@ -236,10 +228,7 @@ export default function RegisterForm() {
               checked={formData.persetujuan}
               onChange={handleChange}
               aria-invalid={!!errors.persetujuan}
-              className="
-                mt-1 size-4 shrink-0
-                accent-aira-primary
-              "
+              className="mt-1 size-4 shrink-0 accent-aira-primary"
             />
 
             <span className="leading-relaxed">
@@ -247,11 +236,7 @@ export default function RegisterForm() {
               <button
                 type="button"
                 onClick={() => openDocument("terms")}
-                className="
-                  font-semibold text-aira-primary
-                  underline underline-offset-2
-                  hover:text-aira-primary-dark
-                "
+                className="font-semibold text-aira-primary underline underline-offset-2 hover:text-aira-primary-dark"
               >
                 Ketentuan Layanan
               </button>
@@ -259,11 +244,7 @@ export default function RegisterForm() {
               <button
                 type="button"
                 onClick={() => openDocument("privacy")}
-                className="
-                  font-semibold text-aira-primary
-                  underline underline-offset-2
-                  hover:text-aira-primary-dark
-                "
+                className="font-semibold text-aira-primary underline underline-offset-2 hover:text-aira-primary-dark"
               >
                 Kebijakan Privasi AIRA
               </button>
@@ -274,41 +255,28 @@ export default function RegisterForm() {
           {errors.persetujuan && (
             <p
               role="alert"
-              className="
-                mt-1.5 text-sm font-medium
-                text-aira-danger-dark
-              "
+              className="mt-1.5 text-sm font-medium text-aira-danger-dark"
             >
               {errors.persetujuan}
             </p>
           )}
         </div>
 
-        {/* PESAN VALIDASI */}
         {notice && (
           <FormMessage type={notice.type}>
             {notice.text}
           </FormMessage>
         )}
 
-        {/* TOMBOL REGISTRASI */}
         <Button
           type="submit"
           disabled={isPending}
-          className="
-            h-14 w-full rounded-full
-            bg-aira-primary px-8
-            text-lg font-semibold text-white
-            shadow-soft
-            hover:bg-aira-primary-dark
-            disabled:opacity-50
-          "
+          className="h-14 w-full rounded-full bg-aira-primary px-8 text-lg font-semibold text-white shadow-soft hover:bg-aira-primary-dark disabled:opacity-50"
         >
           {isPending ? "Mendaftarkan..." : "Daftar Sekarang"}
         </Button>
       </form>
 
-      {/* LINK LOGIN */}
       <p className="mt-6 text-center text-[15px]">
         Sudah punya akun?{" "}
         <Link
@@ -319,7 +287,6 @@ export default function RegisterForm() {
         </Link>
       </p>
 
-      {/* MODAL KETENTUAN DAN PRIVASI */}
       <TermsPrivacyDialog
         open={dialogOpen}
         onClose={() => setDialogOpen(false)}
@@ -327,4 +294,4 @@ export default function RegisterForm() {
       />
     </>
   );
-} 
+}

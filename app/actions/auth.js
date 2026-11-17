@@ -11,6 +11,14 @@ function isValidEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
+function normalizePhone(phone) {
+  return String(phone || "").replace(/[\s-]/g, "");
+}
+
+function isValidPhone(phone) {
+  const normalizedPhone = normalizePhone(phone);
+  return /^(\+62|62|0)[0-9]{8,13}$/.test(normalizedPhone);
+}
 
 function getSiteUrl() {
   const configuredUrl = process.env.NEXT_PUBLIC_SITE_URL;
@@ -19,15 +27,12 @@ function getSiteUrl() {
     return configuredUrl.replace(/\/+$/, "");
   }
 
-  // Fallback khusus production AIRA.
   if (process.env.NODE_ENV === "production") {
     return "https://aira-for-every-woman.vercel.app";
   }
 
-  // Untuk pengembangan lokal.
   return "http://localhost:3000";
 }
-
 
 function createCallbackUrl(nextPath) {
   const callbackUrl = new URL(
@@ -53,6 +58,10 @@ export async function register(formData) {
     formData.get("email") || ""
   ).trim().toLowerCase();
 
+  const phoneNumber = normalizePhone(
+    formData.get("phone_number")
+  );
+
   const password = String(
     formData.get("password") || ""
   );
@@ -63,9 +72,16 @@ export async function register(formData) {
 
   const agreement = formData.get("agreement");
 
+  // VALIDASI NAMA
   if (!fullName) {
     return {
       error: "Nama lengkap wajib diisi.",
+    };
+  }
+
+  if (fullName.length < 3) {
+    return {
+      error: "Nama lengkap minimal 3 karakter.",
     };
   }
 
@@ -75,12 +91,21 @@ export async function register(formData) {
     };
   }
 
+  // VALIDASI EMAIL
   if (!email || !isValidEmail(email)) {
     return {
       error: "Format email tidak valid.",
     };
   }
 
+  // VALIDASI NOMOR WHATSAPP
+  if (!phoneNumber || !isValidPhone(phoneNumber)) {
+    return {
+      error: "Nomor WhatsApp tidak valid.",
+    };
+  }
+
+  // VALIDASI PASSWORD
   if (password.length < 8) {
     return {
       error: "Password minimal 8 karakter.",
@@ -93,6 +118,7 @@ export async function register(formData) {
     };
   }
 
+  // VALIDASI PERSETUJUAN
   if (agreement !== "on" && agreement !== true) {
     return {
       error: "Persetujuan wajib dicentang.",
@@ -105,12 +131,14 @@ export async function register(formData) {
     "/masuk?verified=1"
   );
 
+  // REGISTRASI SUPABASE
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
       data: {
         full_name: fullName,
+        phone_number: phoneNumber,
       },
       emailRedirectTo,
     },
@@ -129,6 +157,7 @@ export async function register(formData) {
     };
   }
 
+  // CEK EMAIL YANG SUDAH TERDAFTAR
   if (
     data.user &&
     data.user.identities &&
@@ -139,7 +168,7 @@ export async function register(formData) {
     };
   }
 
-  // Jika konfirmasi email aktif, session belum tersedia.
+  // JIKA KONFIRMASI EMAIL AKTIF
   if (!data.session) {
     return {
       success:
@@ -147,7 +176,7 @@ export async function register(formData) {
     };
   }
 
-  // Jika konfirmasi email tidak diwajibkan.
+  // JIKA KONFIRMASI EMAIL TIDAK DIWAJIBKAN
   redirect("/dashboard");
 }
 
@@ -186,10 +215,7 @@ export async function login(formData) {
     password,
   });
 
-  // ------------------------------------------
-  // PEMERIKSAAN AUTENTIKASI SUPABASE
-  // ------------------------------------------
-
+  // PEMERIKSAAN AUTENTIKASI
   if (authError || !authData?.user) {
     console.error("LOGIN AUTH ERROR:", {
       message: authError?.message,
@@ -197,9 +223,7 @@ export async function login(formData) {
       status: authError?.status,
     });
 
-    if (
-      authError?.code === "email_not_confirmed"
-    ) {
+    if (authError?.code === "email_not_confirmed") {
       return {
         error:
           "Email belum dikonfirmasi. Silakan periksa email kamu dan lakukan konfirmasi terlebih dahulu.",
@@ -216,9 +240,7 @@ export async function login(formData) {
       };
     }
 
-    if (
-      authError?.code === "invalid_credentials"
-    ) {
+    if (authError?.code === "invalid_credentials") {
       return {
         error:
           "Email atau password yang kamu masukkan salah. Periksa kembali data login kamu.",
@@ -231,17 +253,14 @@ export async function login(formData) {
     };
   }
 
-  // ------------------------------------------
   // PEMERIKSAAN PROFIL PENGGUNA
-  // ------------------------------------------
-
   const {
     data: profile,
     error: profileError,
   } = await supabase
     .from("users")
     .select(
-      "user_id, full_name, email, role, account_status"
+      "user_id, full_name, email, phone_number, role, account_status"
     )
     .eq("user_id", authData.user.id)
     .maybeSingle();
@@ -274,10 +293,7 @@ export async function login(formData) {
     };
   }
 
-  // ------------------------------------------
   // PEMERIKSAAN STATUS AKUN
-  // ------------------------------------------
-
   if (profile.account_status !== "active") {
     await supabase.auth.signOut();
 
@@ -287,10 +303,7 @@ export async function login(formData) {
     };
   }
 
-  // ------------------------------------------
   // PENGALIHAN BERDASARKAN ROLE
-  // ------------------------------------------
-
   if (profile.role === "admin") {
     redirect("/admin");
   }
@@ -401,7 +414,7 @@ export async function updatePassword(formData) {
 
   const supabase = await createClient();
 
-  // Pastikan pengguna memiliki session pemulihan.
+  // PASTIKAN SESSION PEMULIHAN TERSEDIA
   const {
     data: { user },
     error: userError,
@@ -431,8 +444,6 @@ export async function updatePassword(formData) {
     };
   }
 
-  // Setelah password diperbarui,
-  // pengguna diminta login kembali.
   await supabase.auth.signOut();
 
   return {
