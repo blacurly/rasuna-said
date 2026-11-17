@@ -57,7 +57,7 @@ export default function KartuTitikAir({ titik, tingkat }) {
         </span>
         <Link
           href={`/navigasi-air/${titik.id}`}
-          className="group inline-flex min-h-[48px] items-center gap-2 rounded-full bg-aira-primary px-5 py-3 font-semibold text-white transition-colors hover:bg-aira-primary-dark"
+          className="group inline-flex min-h-[48px] items-center gap-2 rounded-full border-2 border-aira-primary px-5 py-3 font-semibold text-aira-primary transition-colors hover:bg-aira-primary/10"
         >
           Lihat Detail <ArrowRight className="size-4 transition-transform group-hover:translate-x-1" />
         </Link>
