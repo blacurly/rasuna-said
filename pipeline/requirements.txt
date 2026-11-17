@@ -11,11 +11,14 @@ supabase>=2.6,<3.0
 # Google Drive PDF downloader
 gdown>=5.2,<6.0
 
-# Text embedding
-sentence-transformers>=3.0,<6.0
+# Text embedding (Gemini API)
+google-genai>=1.0,<2.0
 
 # OCR wrapper
 pytesseract>=0.3.13,<1.0
 
 # Image processing for OCR
 Pillow>=10.4,<13.0
+
+# Environment variables
+python-dotenv>=1.0,<2.0

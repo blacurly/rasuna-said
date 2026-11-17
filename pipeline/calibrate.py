@@ -1,9 +1,11 @@
+import math
 import os
 import sys
 from pathlib import Path
 
 from dotenv import load_dotenv
-from sentence_transformers import SentenceTransformer
+from google import genai
+from google.genai import types
 from supabase import create_client
 
 
@@ -55,10 +57,14 @@ if not SUPABASE_SERVICE_ROLE_KEY:
 # KONFIGURASI MODEL EMBEDDING
 # ==========================================
 
-MODEL_NAME = (
-    "sentence-transformers/"
-    "paraphrase-multilingual-mpnet-base-v2"
-)
+# Harus sama dengan GEMINI_EMBEDDING_MODEL di services/assistantService.js
+MODEL_NAME = os.getenv("GEMINI_EMBEDDING_MODEL", "gemini-embedding-001")
+DIMENSI = int(os.getenv("EMBEDDING_DIMENSION", "768"))
+
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+
+if not GEMINI_API_KEY:
+    raise ValueError("GEMINI_API_KEY belum ditemukan di .env.local")
 
 print("=" * 55)
 print("AIRA - SIMILARITY THRESHOLD CALIBRATION")
@@ -76,7 +82,23 @@ print("Koneksi Supabase berhasil.")
 print("\nMemuat model embedding...")
 print(f"Model: {MODEL_NAME}")
 
-model = SentenceTransformer(MODEL_NAME)
+client = genai.Client(api_key=GEMINI_API_KEY)
+
+
+def embed_pertanyaan(teks):
+    """Embedding pertanyaan, sama seperti buatEmbedding() di assistantService.js."""
+    response = client.models.embed_content(
+        model=MODEL_NAME,
+        contents=teks,
+        config=types.EmbedContentConfig(
+            task_type="RETRIEVAL_QUERY",
+            output_dimensionality=DIMENSI,
+        ),
+    )
+    vector = list(response.embeddings[0].values)
+    norma = math.sqrt(sum(nilai * nilai for nilai in vector))
+    return [nilai / norma for nilai in vector]
+
 
 print("Model embedding berhasil dimuat.")
 
@@ -128,10 +150,7 @@ for index, (jenis, pertanyaan) in enumerate(
 ):
     try:
         # Membuat embedding pertanyaan
-        embedding = model.encode(
-            pertanyaan,
-            normalize_embeddings=True
-        ).tolist()
+        embedding = embed_pertanyaan(pertanyaan)
 
         # Mengambil dokumen paling relevan dari Supabase
         response = supabase.rpc(

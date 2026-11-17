@@ -1,4 +1,3 @@
-
 import "server-only";
 
 import { createClient } from "@supabase/supabase-js";
@@ -14,8 +13,9 @@ const BATAS_PERTANYAAN = 2000;
 const BATAS_JAWABAN = 2500;
 const BATAS_KONTEKS_PER_CHUNK = 4500;
 
-const EMBEDDING_API_URL =
-  process.env.EMBEDDING_API_URL || "";
+// Model embedding WAJIB sama dengan pipeline/ingest.py.
+const GEMINI_EMBEDDING_MODEL =
+  process.env.GEMINI_EMBEDDING_MODEL || "gemini-embedding-001";
 
 const DIMENSI_EMBEDDING = Number(
   process.env.EMBEDDING_DIMENSION || 768
@@ -274,7 +274,7 @@ function hitungRelevansiIsi(pertanyaan, content) {
 }
 
 // ==================================================
-// 7. EMBEDDING PERTANYAAN MELALUI PYTHON
+// 7. EMBEDDING PERTANYAAN MELALUI GEMINI API
 // ==================================================
 
 async function buatEmbedding(pertanyaan) {
@@ -285,40 +285,54 @@ async function buatEmbedding(pertanyaan) {
     throw new Error("Dimensi embedding tidak valid.");
   }
 
-  const apiKey = process.env.EMBEDDING_API_KEY;
-
-  if (!EMBEDDING_API_URL) {
-    throw new Error("EMBEDDING_API_URL belum diatur.");
-  }
+  const apiKey = process.env.GEMINI_API_KEY;
 
   if (!apiKey) {
-    throw new Error("EMBEDDING_API_KEY belum diatur.");
+    throw new Error("GEMINI_API_KEY belum diatur.");
   }
 
-  const response = await fetch(EMBEDDING_API_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      text: pertanyaan,
-    }),
-    signal: AbortSignal.timeout(EMBEDDING_TIMEOUT_MS),
-    cache: "no-store",
-  });
+  const response = await fetch(
+    `${GEMINI_ENDPOINT}/${encodeURIComponent(GEMINI_EMBEDDING_MODEL)}:embedContent`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": apiKey,
+      },
+      body: JSON.stringify({
+        model: `models/${GEMINI_EMBEDDING_MODEL}`,
+        content: {
+          parts: [{ text: pertanyaan }],
+        },
+        // Dokumen di-embed dengan RETRIEVAL_DOCUMENT (pipeline/ingest.py),
+        // pertanyaan dengan RETRIEVAL_QUERY.
+        taskType: "RETRIEVAL_QUERY",
+        outputDimensionality: DIMENSI_EMBEDDING,
+      }),
+      signal: AbortSignal.timeout(EMBEDDING_TIMEOUT_MS),
+      cache: "no-store",
+    }
+  );
 
   if (!response.ok) {
+    let detail = "";
+
+    try {
+      const errorData = await response.json();
+      detail = errorData?.error?.message || "";
+    } catch {
+      // Detail error tidak tersedia.
+    }
+
     throw new Error(
-      `Layanan embedding gagal dengan HTTP ${response.status}.`
+      `Gemini embedding gagal dengan HTTP ${response.status}${detail ? `: ${detail}` : ""}.`
     );
   }
 
   const data = await response.json();
-  const vector = data?.embedding;
+  const vector = data?.embedding?.values;
 
   if (
-    data?.dimension !== DIMENSI_EMBEDDING ||
     !Array.isArray(vector) ||
     vector.length !== DIMENSI_EMBEDDING ||
     !vector.every(
@@ -328,10 +342,12 @@ async function buatEmbedding(pertanyaan) {
     )
   ) {
     throw new Error(
-      "Hasil embedding dari Python tidak valid."
+      "Hasil embedding dari Gemini tidak valid."
     );
   }
 
+  // Hanya output 3072 dimensi yang sudah dinormalisasi oleh API.
+  // Untuk 768 dimensi, vektor harus dinormalisasi sendiri.
   const norma = Math.sqrt(
     vector.reduce(
       (total, nilai) => total + nilai * nilai,
@@ -339,16 +355,13 @@ async function buatEmbedding(pertanyaan) {
     )
   );
 
-  if (
-    !Number.isFinite(norma) ||
-    Math.abs(norma - 1) > 0.01
-  ) {
+  if (!Number.isFinite(norma) || norma === 0) {
     throw new Error(
-      "Embedding tidak dinormalisasi dengan benar."
+      "Embedding tidak dapat dinormalisasi."
     );
   }
 
-  return vector;
+  return vector.map((nilai) => nilai / norma);
 }
 
 // ==================================================

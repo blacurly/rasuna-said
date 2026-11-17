@@ -6,12 +6,13 @@ document_registry (Supabase)
     -> Download PDF (Google Drive)
     -> Extract text + OCR
     -> Chunking
-    -> Generate embedding (Sentence Transformers, 768 dimensi)
+    -> Generate embedding (Gemini API, 768 dimensi)
     -> Save chunks to Supabase
 
 Environment variables:
     NEXT_PUBLIC_SUPABASE_URL      Wajib
     SUPABASE_SERVICE_ROLE_KEY     Wajib
+    GEMINI_API_KEY                Wajib
     FORCE_REPROCESS               true / false (default false)
     MAKS_DOKUMEN                  Angka positif atau kosong
     EMBEDDING_MODEL_NAME          Nama model embedding
@@ -19,6 +20,7 @@ Environment variables:
 """
 
 import hashlib
+import math
 import os
 import re
 import sys
@@ -33,7 +35,8 @@ import pymupdf
 import pytesseract
 
 from PIL import Image
-from sentence_transformers import SentenceTransformer
+from google import genai
+from google.genai import types
 from supabase import create_client
 
 
@@ -55,6 +58,7 @@ def wajib(nama):
 
 NEXT_PUBLIC_SUPABASE_URL = wajib("NEXT_PUBLIC_SUPABASE_URL")
 SUPABASE_SERVICE_ROLE_KEY = wajib("SUPABASE_SERVICE_ROLE_KEY")
+GEMINI_API_KEY = wajib("GEMINI_API_KEY")
 
 if not NEXT_PUBLIC_SUPABASE_URL.startswith(("https://", "http://")):
     sys.exit("❌ NEXT_PUBLIC_SUPABASE_URL harus berupa URL HTTP/HTTPS yang valid.")
@@ -84,9 +88,11 @@ STATUS_DIPROSES = ("pending", "failed")
 HAPUS_CHUNK_VERSI_LAMA = False
 
 
+# Model embedding WAJIB sama dengan GEMINI_EMBEDDING_MODEL
+# di services/assistantService.js.
 EMBEDDING_MODEL_NAME = os.environ.get(
     "EMBEDDING_MODEL_NAME",
-    "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
+    "gemini-embedding-001"
 ).strip()
 
 try:
@@ -108,7 +114,8 @@ OCR_BAHASA = "ind+eng"
 OCR_DPI = 300
 MIN_KARAKTER_TEKS = 30
 
-BATCH_EMBEDDING = 16
+BATCH_EMBEDDING = 50
+MAX_RETRY_EMBEDDING = 5
 BATCH_DATABASE = 50
 MAX_RETRY_DATABASE = 3
 
@@ -132,17 +139,57 @@ except Exception as e:
     sys.exit(f"❌ Gagal membuat koneksi Supabase: {e}")
 
 
-print(f"⏳ Memuat model embedding: {EMBEDDING_MODEL_NAME}")
+print(f"⏳ Menyiapkan Gemini embedding: {EMBEDDING_MODEL_NAME}")
 
 try:
-    embedding_model = SentenceTransformer(
-        EMBEDDING_MODEL_NAME
-    )
+    gemini_client = genai.Client(api_key=GEMINI_API_KEY)
 except Exception as e:
-    sys.exit(f"❌ Gagal memuat model embedding: {e}")
+    sys.exit(f"❌ Gagal membuat client Gemini: {e}")
 
 
-dimensi_model = embedding_model.get_sentence_embedding_dimension()
+def normalisasi(vector):
+    """Hanya output 3072 dimensi yang dinormalisasi oleh API.
+    Untuk 768 dimensi, vektor harus dinormalisasi sendiri."""
+    norma = math.sqrt(sum(nilai * nilai for nilai in vector))
+
+    if not math.isfinite(norma) or norma == 0:
+        raise ValueError("Embedding tidak dapat dinormalisasi.")
+
+    return [nilai / norma for nilai in vector]
+
+
+def embed_batch(teks_list):
+    """Membuat embedding untuk satu batch teks, dengan retry."""
+    for percobaan in range(MAX_RETRY_EMBEDDING):
+        try:
+            response = gemini_client.models.embed_content(
+                model=EMBEDDING_MODEL_NAME,
+                contents=teks_list,
+                config=types.EmbedContentConfig(
+                    task_type="RETRIEVAL_DOCUMENT",
+                    output_dimensionality=EMBEDDING_DIM,
+                ),
+            )
+            return [
+                normalisasi(list(item.values))
+                for item in response.embeddings
+            ]
+        except Exception as e:
+            if percobaan == MAX_RETRY_EMBEDDING - 1:
+                raise
+
+            jeda = 5 * (percobaan + 1)
+            print(
+                f"   ⏳ Embedding gagal ({str(e)[:100]}), "
+                f"coba lagi dalam {jeda} detik..."
+            )
+            time.sleep(jeda)
+
+
+try:
+    dimensi_model = len(embed_batch(["tes koneksi embedding"])[0])
+except Exception as e:
+    sys.exit(f"❌ Gagal memanggil Gemini embedding: {e}")
 
 if dimensi_model != EMBEDDING_DIM:
     sys.exit(
@@ -453,17 +500,13 @@ def generate_embeddings(chunks):
         for chunk in chunks
     ]
 
-    vectors = embedding_model.encode(
-        contents,
-        batch_size=BATCH_EMBEDDING,
-        show_progress_bar=False,
-        normalize_embeddings=True
-    )
+    embeddings = []
 
-    embeddings = [
-        vector.tolist()
-        for vector in vectors
-    ]
+    for start in range(0, len(contents), BATCH_EMBEDDING):
+        embeddings.extend(
+            embed_batch(contents[start:start + BATCH_EMBEDDING])
+        )
+        time.sleep(1)  # jeda singkat supaya tidak kena rate limit
 
     if len(embeddings) != len(chunks):
         raise ValueError(
