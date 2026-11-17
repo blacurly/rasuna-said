@@ -6,6 +6,11 @@ import Combobox from "@/components/navigasi/Combobox";
 import KartuTitikAir from "@/components/navigasi/KartuTitikAir";
 import { getTitikAirPublikAction } from "@/app/actions/navigasi-air";
 import {
+  formatNamaKabupaten,
+  formatNamaKecamatan,
+  formatNamaProvinsi,
+} from "@/lib/formatWilayah";
+import {
   JENIS_SEMUA,
   JENIS_TITIK_AIR,
   cariTitikAir,
@@ -107,13 +112,13 @@ export default function DaftarTitikAir() {
 
   // Mencari data provinsi yang dipilih.
   const dataProvinsi = wilayah.provinces.find(
-    (item) => item.province_name === provinsi
+    (item) => formatNamaProvinsi(item.province_name) === provinsi
   );
 
   // Mencari data kabupaten/kota berdasarkan provinsi.
   const dataKabupaten = wilayah.regencies.find(
     (item) =>
-      item.city_regency_name === kabupaten &&
+      formatNamaKabupaten(item.city_regency_name) === kabupaten &&
       Number(item.provinces_id) ===
         Number(dataProvinsi?.province_id)
   );
@@ -125,7 +130,7 @@ export default function DaftarTitikAir() {
         Number(item.provinces_id) ===
         Number(dataProvinsi?.province_id)
     )
-    .map((item) => item.city_regency_name);
+    .map((item) => formatNamaKabupaten(item.city_regency_name));
 
   // Menampilkan kecamatan sesuai kabupaten/kota yang dipilih.
   const opsiKecamatan = wilayah.districts
@@ -134,7 +139,7 @@ export default function DaftarTitikAir() {
         Number(item.city_regency_id) ===
         Number(dataKabupaten?.city_regency_id)
     )
-    .map((item) => item.district_name);
+    .map((item) => formatNamaKecamatan(item.district_name));
 
   const diketik = kataKunci.trim();
 
@@ -258,7 +263,7 @@ export default function DaftarTitikAir() {
 
   return (
     <div className="min-h-[calc(100vh-72px)] bg-aira-bg">
-      <div className="fade-up mx-auto max-w-[1240px] px-4 py-10 sm:px-5 sm:py-16">
+      <div className="fade-up mx-auto max-w-310 px-4 py-10 sm:px-5 sm:py-16">
         <h1 className="text-3xl font-bold leading-tight text-aira-primary sm:text-[2.5rem]">
           Daftar Titik Air
         </h1>
@@ -308,7 +313,7 @@ export default function DaftarTitikAir() {
                 onClick={() => setPanel(!panel)}
                 aria-expanded={panel}
                 aria-controls="filter-wilayah"
-                className="inline-flex min-h-[52px] flex-1 items-center justify-center gap-2 rounded-2xl border-2 border-aira-primary/25 px-5 font-semibold text-aira-primary hover:bg-aira-primary/10 md:hidden"
+                className="inline-flex min-h-13 flex-1 items-center justify-center gap-2 rounded-2xl border-2 border-aira-primary/25 px-5 font-semibold text-aira-primary hover:bg-aira-primary/10 md:hidden"
               >
                 <SlidersHorizontal className="size-4" />
 
@@ -322,7 +327,7 @@ export default function DaftarTitikAir() {
                 type="button"
                 onClick={() => setAdaAirSaja(!adaAirSaja)}
                 aria-pressed={adaAirSaja}
-                className={`min-h-[52px] flex-1 rounded-2xl border-2 px-5 font-semibold transition-colors md:flex-none ${
+                className={`min-h-13 flex-1 rounded-2xl border-2 px-5 font-semibold transition-colors md:flex-none ${
                   adaAirSaja
                     ? "border-aira-primary bg-aira-primary text-white"
                     : "border-aira-primary/25 text-aira-primary hover:bg-aira-primary/10"
@@ -343,8 +348,8 @@ export default function DaftarTitikAir() {
             <Combobox
               label="Provinsi"
               placeholder="Pilih provinsi"
-              options={wilayah.provinces.map(
-                (item) => item.province_name
+              options={wilayah.provinces.map((item) =>
+                formatNamaProvinsi(item.province_name)
               )}
               value={provinsi}
               onSelect={(nama) => {
@@ -387,7 +392,7 @@ export default function DaftarTitikAir() {
                   type="button"
                   onClick={chip.hapus}
                   aria-label={`Hapus filter ${chip.label}`}
-                  className="inline-flex min-h-[44px] items-center gap-1.5 rounded-full bg-aira-sage/40 px-3.5 text-sm font-medium text-aira-primary-dark hover:bg-aira-sage/60 focus-visible:ring-2 focus-visible:ring-aira-primary/30"
+                  className="inline-flex min-h-11 items-center gap-1.5 rounded-full bg-aira-sage/40 px-3.5 text-sm font-medium text-aira-primary-dark hover:bg-aira-sage/60 focus-visible:ring-2 focus-visible:ring-aira-primary/30"
                 >
                   {chip.label}
                   <X className="size-3.5" />
@@ -397,7 +402,7 @@ export default function DaftarTitikAir() {
               <button
                 type="button"
                 onClick={reset}
-                className="min-h-[44px] px-2 text-sm font-semibold text-aira-primary underline"
+                className="min-h-11 px-2 text-sm font-semibold text-aira-primary underline"
               >
                 Reset filter
               </button>
@@ -471,7 +476,7 @@ export default function DaftarTitikAir() {
                   <button
                     type="button"
                     onClick={reset}
-                    className="mt-5 min-h-[48px] rounded-full bg-aira-primary px-6 py-3 font-semibold text-white hover:bg-aira-primary-dark"
+                    className="mt-5 min-h-12 rounded-full bg-aira-primary px-6 py-3 font-semibold text-white hover:bg-aira-primary-dark"
                   >
                     Reset filter
                   </button>
