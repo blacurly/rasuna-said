@@ -1,6 +1,10 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import {
+  susunInformasiWilayah,
+  susunMetadataSumber,
+} from "@/lib/waterPointLocation";
 
 const KOLOM_TITIK_AIR = `
   water_point_id,
@@ -89,19 +93,6 @@ function formatTanggal(value) {
   })}`;
 }
 
-function gabungkanAlamat(titik, wilayah) {
-  return [
-    titik.address_detail,
-    titik.village,
-    wilayah.districtName,
-    wilayah.regencyName,
-    wilayah.provinceName,
-  ]
-    .filter(Boolean)
-    .filter((value, index, array) => array.indexOf(value) === index)
-    .join(", ");
-}
-
 function petakanTitik(titik, wilayah) {
   const province = wilayah.provinces.find(
     (item) => Number(item.province_id) === Number(titik.province_id)
@@ -117,13 +108,18 @@ function petakanTitik(titik, wilayah) {
       Number(item.district_id) === Number(titik.district_id)
   );
 
-  const namaWilayah = {
-    provinceName: province?.province_name || "",
-    regencyName: regency?.city_regency_name || "",
-    districtName: district?.district_name || "",
-  };
+  const lokasi = susunInformasiWilayah({
+    village: titik.village,
+    districtName: district?.district_name,
+    regencyName: regency?.city_regency_name,
+    provinceName: province?.province_name,
+    addressDetail: titik.address_detail,
+  });
 
-  const alamat = gabungkanAlamat(titik, namaWilayah);
+  const sumber = susunMetadataSumber({
+    informationSource: titik.information_source,
+    description: titik.description,
+  });
 
   const tanggalPembaruan =
     titik.last_status_checked_at ||
@@ -135,17 +131,16 @@ function petakanTitik(titik, wilayah) {
     name: titik.point_name,
     type: labelJenis(titik.water_source_type),
 
-    area: [
-      namaWilayah.districtName,
-      namaWilayah.regencyName,
-    ]
-      .filter(Boolean)
-      .join(", "),
-
-    address: alamat,
-    kecamatan: namaWilayah.districtName,
-    kabupaten: namaWilayah.regencyName,
-    provinsi: namaWilayah.provinceName,
+    // Informasi wilayah terstruktur; dipakai konsisten di daftar dan detail.
+    area: [lokasi.district, lokasi.regency].filter(Boolean).join(", "),
+    address: lokasi.address,
+    addressDetail: lokasi.addressDetail,
+    village: lokasi.village,
+    kecamatan: lokasi.district,
+    kabupaten: lokasi.regency,
+    provinsi: lokasi.province,
+    country: "Indonesia",
+    hasAdministrativeData: lokasi.hasAdministrativeData,
 
     latitude: titik.latitude,
     longitude: titik.longitude,
@@ -166,8 +161,9 @@ function petakanTitik(titik, wilayah) {
 
     locationHint: titik.location_hint,
     usagePurpose: titik.usage_purpose,
-    source: titik.information_source,
-    note: titik.description,
+    source: sumber.sourceLabel,
+    sourceMetadata: sumber.metadata,
+    note: sumber.note,
 
     isSimulation: titik.is_simulation === true,
   };

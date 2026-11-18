@@ -21,6 +21,7 @@ import { Input } from "@/components/ui/input";
 import {
   ambilCurahHujanLokasi,
   hitungKalkulator,
+  simpanRekomendasiAssessment,
 } from "@/app/actions/kalkulator";
 import {
   bacaDraftKalkulator,
@@ -251,9 +252,57 @@ export default function KalkulatorForm({ awal = null }) {
       );
     }
 
-    console.log("[AIRA] Penyimpanan berhasil:", data);
+    // RPC save_water_assessment adalah SATU-SATUNYA jalur penyimpanan
+    // household + water_assessments untuk submit formulir ini.
+    // Ambil ID assessment dari hasil RPC, lalu hubungkan rekomendasi ke ID yang sama.
+    const rpcResult = Array.isArray(data) ? data[0] : data;
+    const assessmentId = Number(
+      rpcResult?.assessment_id ??
+      rpcResult?.assessmentId ??
+      rpcResult?.assessment?.assessment_id ??
+      rpcResult?.data?.assessment_id
+    );
 
-    return data;
+    let recommendationSave = {
+      saved: false,
+      reason: "assessment_id_not_returned_by_rpc",
+    };
+
+    if (Number.isSafeInteger(assessmentId) && assessmentId > 0) {
+      try {
+        recommendationSave = await simpanRekomendasiAssessment(
+          assessmentId,
+          hasil?.rekomendasi?.items ?? []
+        );
+      } catch (recommendationError) {
+        console.error(
+          "[AIRA] Assessment tersimpan, tetapi rekomendasi gagal disimpan:",
+          recommendationError
+        );
+        recommendationSave = {
+          saved: false,
+          reason: "recommendation_save_failed",
+          error: recommendationError?.message,
+        };
+      }
+    } else {
+      console.error(
+        "[AIRA] RPC berhasil tetapi tidak mengembalikan assessment_id. Periksa return value save_water_assessment.",
+        data
+      );
+    }
+
+    const hasilSimpan = {
+      ...rpcResult,
+      assessment_id: Number.isSafeInteger(assessmentId) && assessmentId > 0
+        ? assessmentId
+        : null,
+      recommendation_save: recommendationSave,
+    };
+
+    console.log("[AIRA] Penyimpanan household + assessment:", hasilSimpan);
+
+    return hasilSimpan;
   }
 
   // ==========================================
@@ -279,7 +328,9 @@ export default function KalkulatorForm({ awal = null }) {
 
     try {
       // 1. Jalankan perhitungan.
-      const hasil = await hitungKalkulator(value);
+      // Jangan simpan assessment dari Server Action di jalur ini.
+      // RPC di simpanKeSupabase menyimpan satu assessment yang memiliki household_id.
+      const hasil = await hitungKalkulator(value, { simpanRiwayat: false });
 
       if (!hasil.valid) {
         setGagal(
@@ -408,7 +459,7 @@ export default function KalkulatorForm({ awal = null }) {
               role="radiogroup"
               aria-label="Kondisi sumber air"
             >
-              <span className="mb-2 block text-[15px] font-semibold">
+              <span className="mb-2 block text-aira-body font-semibold">
                 Kondisi Sumber Air
               </span>
 
@@ -479,7 +530,7 @@ export default function KalkulatorForm({ awal = null }) {
 
             <div>
               <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                <span className="flex items-center gap-2 text-[15px] font-semibold">
+                <span className="flex items-center gap-2 text-aira-body font-semibold">
                   <Droplet className="size-4 text-aira-secondary" />
                   Volume Air Saat Ini
                 </span>
@@ -524,7 +575,7 @@ export default function KalkulatorForm({ awal = null }) {
           <div className="rounded-2xl bg-aira-sand p-5">
             <div className="flex items-start gap-4">
               <div className="flex-1">
-                <p className="text-[15px] font-semibold">
+                <p className="text-aira-body font-semibold">
                   Kebutuhan Kebersihan Menstruasi (MHM){" "}
                   <span className="ml-1 rounded-full bg-white px-2 py-0.5 text-xs font-medium text-aira-text/70">
                     Opsional
@@ -559,7 +610,7 @@ export default function KalkulatorForm({ awal = null }) {
 
             {value.mhm && (
               <div className="mt-5 flex flex-wrap items-center justify-between gap-4 border-t border-aira-text/10 pt-5">
-                <span className="max-w-75 text-[15px] font-medium">
+                <span className="max-w-75 text-aira-body font-medium">
                   Jumlah anggota keluarga yang sedang mengalami menstruasi
                 </span>
 

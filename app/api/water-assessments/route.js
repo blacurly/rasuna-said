@@ -21,9 +21,9 @@ export async function POST(request) {
   }
 
   try {
-    // Memanggil alur kalkulator AIRA yang sama dengan halaman web:
-    // validasi, curah hujan, perhitungan, rule-based recommendation,
-    // dan penyimpanan water_assessments + assessment_recommendations.
+    // Endpoint API mandiri: kalkulasi dan penyimpanan server-side.
+    // Form halaman web memakai jalur RPC household tersendiri dan menonaktifkan
+    // penyimpanan assessment dari Server Action agar tidak terjadi double insert.
     const result = await hitungKalkulator(body);
 
     if (!result?.valid) {

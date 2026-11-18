@@ -2,6 +2,10 @@ import "server-only";
 
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
+import {
+  susunInformasiWilayah,
+  susunMetadataSumber,
+} from "@/lib/waterPointLocation";
 
 const KOLOM_TITIK_AIR = `
   water_point_id,
@@ -80,28 +84,6 @@ function formatTanggal(value) {
   })} WIB`;
 }
 
-function gabungkanAlamat({
-  address_detail,
-  village,
-  districtName,
-  regencyName,
-  provinceName,
-}) {
-  const bagian = [
-    address_detail,
-    village,
-    districtName,
-    regencyName,
-    provinceName,
-  ];
-
-  const hasil = bagian
-    .filter(Boolean)
-    .map((item) => item.trim())
-    .filter((item, index, array) => array.indexOf(item) === index);
-
-  return hasil.join(", ") || "Informasi alamat belum tersedia";
-}
 
 async function ambilDataWilayah(supabase) {
   const [provinsiResult, kabupatenResult, kecamatanResult] =
@@ -134,20 +116,30 @@ async function ambilDataWilayah(supabase) {
 
 function petakanTitikAir(titik, wilayah) {
   const provinsi = wilayah.provinsi.find(
-    (item) => item.province_id === titik.province_id
+    (item) => Number(item.province_id) === Number(titik.province_id)
   );
 
   const kabupaten = wilayah.kabupaten.find(
-    (item) => item.city_regency_id === titik.city_regency_id
+    (item) =>
+      Number(item.city_regency_id) === Number(titik.city_regency_id)
   );
 
   const kecamatan = wilayah.kecamatan.find(
-    (item) => item.district_id === titik.district_id
+    (item) => Number(item.district_id) === Number(titik.district_id)
   );
 
-  const namaProvinsi = provinsi?.province_name || "";
-  const namaKabupaten = kabupaten?.city_regency_name || "";
-  const namaKecamatan = kecamatan?.district_name || "";
+  const lokasi = susunInformasiWilayah({
+    village: titik.village,
+    districtName: kecamatan?.district_name,
+    regencyName: kabupaten?.city_regency_name,
+    provinceName: provinsi?.province_name,
+    addressDetail: titik.address_detail,
+  });
+
+  const sumber = susunMetadataSumber({
+    informationSource: titik.information_source,
+    description: titik.description,
+  });
 
   return {
     id: String(titik.water_point_id),
@@ -156,21 +148,18 @@ function petakanTitikAir(titik, wilayah) {
     name: titik.point_name,
     type: labelJenisAir(titik.water_source_type),
 
-    area: [namaKecamatan, namaKabupaten]
+    area: [lokasi.district, lokasi.regency]
       .filter(Boolean)
       .join(", "),
 
-    address: gabungkanAlamat({
-      address_detail: titik.address_detail,
-      village: titik.village,
-      districtName: namaKecamatan,
-      regencyName: namaKabupaten,
-      provinceName: namaProvinsi,
-    }),
-
-    kecamatan: namaKecamatan,
-    kabupaten: namaKabupaten,
-    provinsi: namaProvinsi,
+    address: lokasi.address,
+    addressDetail: lokasi.addressDetail,
+    village: lokasi.village,
+    kecamatan: lokasi.district,
+    kabupaten: lokasi.regency,
+    provinsi: lokasi.province,
+    country: "Indonesia",
+    hasAdministrativeData: lokasi.hasAdministrativeData,
 
     latitude: titik.latitude,
     longitude: titik.longitude,
@@ -193,8 +182,9 @@ function petakanTitikAir(titik, wilayah) {
 
     locationHint: titik.location_hint || "",
     usagePurpose: titik.usage_purpose || "",
-    source: titik.information_source || "",
-    note: titik.description || "",
+    source: sumber.sourceLabel,
+    sourceMetadata: sumber.metadata,
+    note: sumber.note,
 
     isSimulation: Boolean(titik.is_simulation),
     isActive: titik.is_active,
