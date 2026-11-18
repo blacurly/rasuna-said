@@ -336,15 +336,37 @@ def ambil_chunk_eksisting(document_id, checksum):
 
 
 def embedding_gemini_valid(row):
-    """Memastikan chunk benar-benar memiliki embedding Gemini 768 dimensi."""
+    """Memvalidasi embedding Gemini dari Supabase.
+
+    Kolom pgvector dapat dikembalikan PostgREST/Supabase sebagai string
+    seperti "[0.1, -0.2, ...]", bukan selalu sebagai Python list.
+    Karena itu, dukung list/tuple maupun representasi string pgvector.
+    """
     if row.get("embedding_model") != EMBEDDING_MODEL_NAME:
         return False
+
     vector = row.get("embedding")
-    if not isinstance(vector, list) or len(vector) != EMBEDDING_DIM:
+    if vector is None:
         return False
+
     try:
-        return all(math.isfinite(float(value)) for value in vector)
-    except (TypeError, ValueError):
+        if isinstance(vector, (list, tuple)):
+            values = [float(value) for value in vector]
+        elif isinstance(vector, str):
+            raw = vector.strip()
+            if raw.startswith("[") and raw.endswith("]"):
+                raw = raw[1:-1].strip()
+            if not raw:
+                return False
+            values = [float(value.strip()) for value in raw.split(",")]
+        else:
+            return False
+
+        if len(values) != EMBEDDING_DIM:
+            return False
+
+        return all(math.isfinite(value) for value in values)
+    except (TypeError, ValueError, OverflowError):
         return False
 
 
