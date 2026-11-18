@@ -19,7 +19,17 @@ import {
   ChevronRight,
 } from "lucide-react";
 
-import AdminSidebar from "@/components/admin/AdminSidebar";
+import AdminShell from "@/components/admin/AdminShell";
+import AdminPageHeader from "@/components/admin/AdminPageHeader";
+import UserManagement from "@/components/admin/pengguna/UserManagement";
+import {
+  adminCard,
+  adminH2,
+  adminTh,
+  adminBtnPrimary,
+  adminBtnOutline,
+  adminBtnSm,
+} from "@/components/admin/adminStyles";
 
 import {
   MOCK_ADMIN,
@@ -43,55 +53,47 @@ const statColors = {
   sage: "bg-[#DDF0E8] text-[#327D69]",
 };
 
+// Tujuan tiap kartu (sesuai route yang ada).
+const STAT_DESTINATIONS = {
+  verified: "/admin/kelola-titik-air",
+  pending: "/admin/verifikasi",
+  activity: "#riwayat-aktivitas",
+};
+
 // ============================================
 // KARTU STATISTIK DASHBOARD
 // ============================================
 
 function AdminStatCard({ stat }) {
   const Icon = statIcons[stat.icon] || Activity;
-
-  // Card aktivitas diarahkan ke bagian riwayat pada halaman yang sama.
-  // Dua card lainnya tetap menggunakan href dari mockAdmin.js.
-  const destination =
-    stat.title === "Aktivitas Admin Hari Ini"
-      ? "#riwayat-aktivitas"
-      : stat.href;
-
-  const isActivityCard =
-    stat.title === "Aktivitas Admin Hari Ini";
+  const destination = STAT_DESTINATIONS[stat.id] ?? stat.href ?? "#";
 
   return (
     <Link
-      href={destination || "#"}
+      href={destination}
       aria-label={`Lihat ${stat.title}`}
-      className="group flex min-h-[136px] flex-col justify-between rounded-[20px] border border-aira-primary/5 bg-white p-5 shadow-[0_8px_28px_-10px_rgba(23,107,120,0.18)] transition-all duration-200 hover:-translate-y-1 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-aira-primary focus-visible:ring-offset-2"
+      className={`${adminCard} group flex min-h-[128px] flex-col justify-between p-5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-aira-primary focus-visible:ring-offset-2`}
     >
       <div className="flex items-start justify-between gap-3">
-        <p className="text-sm font-medium leading-snug text-aira-text/80">
+        <p className="text-sm font-medium leading-snug text-aira-text/75">
           {stat.title}
         </p>
 
         <div
-          className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${statColors[stat.color]}`}
+          className={`flex size-9 shrink-0 items-center justify-center rounded-xl ${statColors[stat.color]}`}
         >
-          <Icon className="size-5" />
+          <Icon className="size-[18px]" />
         </div>
       </div>
 
       <div className="mt-3">
-        <p className="text-3xl font-bold tracking-tight text-aira-primary">
+        <p className="text-2xl font-bold tracking-tight text-aira-primary sm:text-3xl">
           {stat.value}
         </p>
 
-        <p className="mt-1 text-xs leading-relaxed text-aira-text/60">
+        <p className="mt-1 text-xs leading-relaxed text-aira-text/55">
           {stat.description}
-          <ArrowRight
-            className={`ml-1 inline size-3.5 transition-transform duration-200 ${
-              isActivityCard
-                ? "group-hover:translate-x-1"
-                : "group-hover:translate-x-1"
-            }`}
-          />
+          <ArrowRight className="ml-1 inline size-3.5 transition-transform duration-200 group-hover:translate-x-1" />
         </p>
       </div>
     </Link>
@@ -155,8 +157,10 @@ function UserStatCard({ stat, value }) {
   const Icon = stat.icon;
 
   return (
-    <div className="flex min-h-[120px] flex-col justify-between rounded-[18px] border border-aira-primary/5 bg-white p-4 shadow-[0_8px_28px_-10px_rgba(23,107,120,0.12)] sm:p-5">
-      <div className="flex items-start justify-between gap-2">
+    <div
+      className={`${adminCard} flex min-h-[128px] flex-col justify-between p-5`}
+    >
+      <div className="flex items-start justify-between gap-3">
         <p className="text-sm font-medium leading-snug text-aira-text/75">
           {stat.title}
         </p>
@@ -173,9 +177,7 @@ function UserStatCard({ stat, value }) {
           {Number(value || 0).toLocaleString("id-ID")}
         </p>
 
-        <p className="mt-1 text-xs text-aira-text/55">
-          {stat.description}
-        </p>
+        <p className="mt-1 text-xs text-aira-text/55">{stat.description}</p>
       </div>
     </div>
   );
@@ -185,7 +187,7 @@ function UserStatCard({ stat, value }) {
 // INTEGRASI API STATISTIK PENGGUNA
 // ============================================
 
-function AdminUserStatistics() {
+function AdminUserStatistics({ refreshKey, onManage }) {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -212,9 +214,7 @@ function AdminUserStatistics() {
       setStats(result.data);
     } catch (err) {
       console.error("[AdminUserStatistics]", err);
-      setError(
-        err.message || "Terjadi kesalahan saat mengambil statistik."
-      );
+      setError(err.message || "Terjadi kesalahan saat mengambil statistik.");
     } finally {
       setLoading(false);
     }
@@ -222,32 +222,35 @@ function AdminUserStatistics() {
 
   useEffect(() => {
     fetchUserStats();
-  }, [fetchUserStats]);
+  }, [fetchUserStats, refreshKey]);
 
   return (
     <section className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="space-y-1">
-          <h2 className="text-lg font-bold tracking-tight text-aira-primary">
-            Statistik Pengguna
-          </h2>
+          <h2 className={adminH2}>Statistik Pengguna</h2>
 
           <p className="text-sm text-aira-text/60">
             Ringkasan akun pengguna yang terdaftar di AIRA.
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={fetchUserStats}
-          disabled={loading}
-          className="inline-flex items-center justify-center gap-2 self-start rounded-xl border border-aira-primary/20 bg-white px-4 py-2.5 text-sm font-semibold text-aira-primary transition-colors hover:bg-aira-sage/20 disabled:cursor-not-allowed disabled:opacity-50 sm:self-auto"
-        >
-          <RefreshCw
-            className={`size-4 ${loading ? "animate-spin" : ""}`}
-          />
-          Perbarui Data
-        </button>
+        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+          <button type="button" onClick={onManage} className={adminBtnPrimary}>
+            <UserCog className="size-4" />
+            Kelola Status Akun
+          </button>
+
+          <button
+            type="button"
+            onClick={fetchUserStats}
+            disabled={loading}
+            className={adminBtnOutline}
+          >
+            <RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} />
+            Perbarui Data
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -272,7 +275,7 @@ function AdminUserStatistics() {
           ? USER_STAT_CONFIG.map((stat) => (
               <div
                 key={stat.id}
-                className="min-h-[120px] animate-pulse rounded-[18px] border border-aira-primary/5 bg-white p-5"
+                className={`${adminCard} min-h-[128px] animate-pulse p-5`}
               >
                 <div className="h-4 w-28 rounded bg-gray-100" />
                 <div className="mt-6 h-8 w-16 rounded bg-gray-100" />
@@ -302,10 +305,8 @@ function ContributionStatus() {
   );
 
   return (
-    <section className="rounded-[22px] bg-white px-5 py-5 shadow-[0_8px_28px_-10px_rgba(23,107,120,0.18)] sm:px-6">
-      <h2 className="mb-4 text-base font-semibold text-aira-primary sm:text-lg">
-        Status seluruh kontribusi
-      </h2>
+    <section className={`${adminCard} px-5 py-5 sm:px-6`}>
+      <h2 className={`${adminH2} mb-4`}>Status seluruh kontribusi</h2>
 
       <div
         className="flex h-3.5 w-full overflow-hidden rounded-full bg-gray-100"
@@ -337,9 +338,7 @@ function ContributionStatus() {
 
             <span>{item.label}</span>
 
-            <span className="font-semibold text-aira-text">
-              {item.value}
-            </span>
+            <span className="font-semibold text-aira-text">{item.value}</span>
           </div>
         ))}
       </div>
@@ -379,7 +378,7 @@ function StatusChangeBadge({ status }) {
 
   return (
     <span
-      className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold ${
+      className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold leading-none ${
         styles[status] || "bg-gray-100 text-gray-600"
       }`}
     >
@@ -392,7 +391,7 @@ function StatusChangeBadge({ status }) {
 // TABEL JEJAK AUDIT DARI SUPABASE
 // ============================================
 
-function AuditLogTable() {
+function AuditLogTable({ refreshKey }) {
   const [logs, setLogs] = useState([]);
   const [pagination, setPagination] = useState({
     current_page: 1,
@@ -460,7 +459,7 @@ function AuditLogTable() {
 
   useEffect(() => {
     fetchActivityLogs();
-  }, [fetchActivityLogs]);
+  }, [fetchActivityLogs, refreshKey]);
 
   function handleFilterChange(value) {
     setActiveFilter(value);
@@ -469,26 +468,21 @@ function AuditLogTable() {
 
   const filterOptions = [
     { label: "Semua", value: "all" },
-    {
-      label: "Perubahan status akun",
-      value: "user_status_updated",
-    },
+    { label: "Perubahan status akun", value: "user_status_updated" },
   ];
 
   return (
-  <section
-    id="riwayat-aktivitas"
-    className="w-full scroll-mt-6 overflow-hidden rounded-[22px] border border-aira-primary/5 bg-white shadow-[0_8px_28px_-10px_rgba(23,107,120,0.16)]"
-  >
+    <section
+      id="riwayat-aktivitas"
+      className={`${adminCard} w-full scroll-mt-6 overflow-hidden`}
+    >
       {/* HEADER */}
-      <div className="flex flex-col gap-4 px-5 pt-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+      <div className="flex flex-col gap-3 px-5 pt-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
         <div className="flex items-center gap-2.5">
           <History className="size-5 shrink-0 text-aira-primary" />
 
           <div>
-            <h2 className="text-base font-semibold tracking-tight text-aira-primary sm:text-lg">
-              Jejak audit sistem
-            </h2>
+            <h2 className={adminH2}>Jejak audit sistem</h2>
 
             <p className="mt-0.5 text-xs text-aira-text/55">
               Riwayat aktivitas administratif dari database.
@@ -500,16 +494,14 @@ function AuditLogTable() {
           type="button"
           onClick={fetchActivityLogs}
           disabled={loading}
-          className="inline-flex items-center justify-center gap-2 self-start rounded-xl border border-aira-primary/20 bg-white px-4 py-2.5 text-sm font-semibold text-aira-primary transition-colors hover:bg-aira-sage/20 disabled:cursor-not-allowed disabled:opacity-50 sm:self-auto"
+          className={`${adminBtnOutline} self-start sm:self-auto`}
         >
-          <RefreshCw
-            className={`size-4 ${loading ? "animate-spin" : ""}`}
-          />
+          <RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} />
           Perbarui Riwayat
         </button>
       </div>
 
-      {/* FILTER */}
+      {/* FILTER (gaya sama dengan tab di C02) */}
       <div className="flex flex-wrap gap-2 px-5 pt-4 sm:px-6">
         {filterOptions.map((filter) => (
           <button
@@ -517,10 +509,10 @@ function AuditLogTable() {
             type="button"
             onClick={() => handleFilterChange(filter.value)}
             aria-pressed={activeFilter === filter.value}
-            className={`whitespace-nowrap rounded-full border px-4 py-2 text-xs font-semibold transition-all duration-200 sm:text-sm ${
+            className={`inline-flex h-9 items-center whitespace-nowrap rounded-full border px-4 text-[13px] font-semibold transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-aira-secondary/40 ${
               activeFilter === filter.value
-                ? "border-aira-primary bg-aira-primary text-white"
-                : "border-aira-primary/20 bg-white text-aira-primary hover:bg-aira-sage/20"
+                ? "border-aira-primary bg-aira-primary text-white shadow-sm"
+                : "border-aira-primary/20 bg-white text-aira-primary hover:bg-aira-bg"
             }`}
           >
             {filter.label}
@@ -548,22 +540,22 @@ function AuditLogTable() {
 
       {/* TABEL */}
       <div className="overflow-x-auto px-4 pb-3 pt-4 sm:px-5 sm:pt-5">
-        <table className="w-full min-w-[850px] table-fixed border-collapse text-left">
+        <table className="w-full min-w-[900px] table-fixed border-collapse text-left">
           <colgroup>
-            <col className="w-[18%]" />
-            <col className="w-[16%]" />
-            <col className="w-[19%]" />
+            <col className="w-[15%]" />
+            <col className="w-[14%]" />
             <col className="w-[21%]" />
+            <col className="w-[24%]" />
             <col className="w-[26%]" />
           </colgroup>
 
           <thead>
-            <tr className="border-b border-aira-primary/10 text-xs font-semibold uppercase tracking-wide text-aira-text/55">
-              <th className="px-2 pb-3 pt-1">Waktu</th>
-              <th className="px-2 pb-3 pt-1">Pelaku</th>
-              <th className="px-2 pb-3 pt-1">Aksi</th>
-              <th className="px-2 pb-3 pt-1">Objek</th>
-              <th className="px-2 pb-3 pt-1">Perubahan</th>
+            <tr className="border-b border-aira-primary/10">
+              <th className={adminTh}>Waktu</th>
+              <th className={adminTh}>Pelaku</th>
+              <th className={adminTh}>Aksi</th>
+              <th className={adminTh}>Objek</th>
+              <th className={adminTh}>Perubahan</th>
             </tr>
           </thead>
 
@@ -582,40 +574,43 @@ function AuditLogTable() {
               logs.map((log) => (
                 <tr
                   key={log.activity_id}
-                  className="border-b border-aira-primary/[0.07] transition-colors last:border-0 hover:bg-aira-bg/60"
+                  className="border-b border-aira-primary/[0.08] transition-colors last:border-b-0 hover:bg-aira-bg/60"
                 >
-                  <td className="px-2 py-4 align-middle text-sm leading-relaxed text-aira-text/70">
+                  <td className="min-w-0 px-3 py-4 align-middle text-sm leading-snug text-aira-text/70">
                     {formatActivityDate(log.created_at)}
                   </td>
 
-                  <td className="break-words px-2 py-4 align-middle text-sm font-medium leading-relaxed text-aira-text">
+                  <td className="min-w-0 break-words px-3 py-4 align-middle text-sm font-medium leading-snug text-aira-text">
                     {log.admin_name || "Admin tidak ditemukan"}
                   </td>
 
-                  <td className="px-2 py-4 align-middle">
-                    <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-[#E0EDF7] px-3 py-1.5 text-xs font-medium text-[#28658A]">
-                      <ShieldCheck className="size-4 shrink-0" />
+                  <td className="min-w-0 px-3 py-4 align-middle">
+                    <span className="inline-flex max-w-full items-center gap-1.5 whitespace-nowrap rounded-full bg-[#E0EDF7] px-2.5 py-1 text-xs font-medium leading-none text-[#28658A]">
+                      <ShieldCheck className="size-3.5 shrink-0" />
                       Perubahan status akun
                     </span>
                   </td>
 
-                  <td className="break-words px-2 py-4 align-middle text-sm font-medium leading-relaxed text-aira-primary">
-                    <p>{log.target_user_name || "Pengguna tidak ditemukan"}</p>
-                    <p className="mt-1 text-xs font-normal text-aira-text/50">
+                  <td className="min-w-0 px-3 py-4 align-middle">
+                    <p className="break-words text-sm font-semibold leading-snug text-aira-primary">
+                      {log.target_user_name || "Pengguna tidak ditemukan"}
+                    </p>
+                    <p
+                      className="mt-1 truncate text-xs leading-snug text-aira-text/50"
+                      title={log.target_user_id}
+                    >
                       {log.target_user_id}
                     </p>
                   </td>
 
-                  <td className="px-2 py-4 align-middle text-sm leading-relaxed text-aira-text/70">
+                  <td className="min-w-0 px-3 py-4 align-middle">
                     <div className="flex flex-wrap items-center gap-2">
                       <StatusChangeBadge status={log.old_status} />
-
                       <ArrowRight className="size-3.5 text-aira-text/40" />
-
                       <StatusChangeBadge status={log.new_status} />
                     </div>
 
-                    <p className="mt-2 text-xs leading-relaxed text-aira-text/60">
+                    <p className="mt-2 text-xs leading-relaxed text-aira-text/55">
                       {log.description || "Perubahan status akun pengguna."}
                     </p>
                   </td>
@@ -638,8 +633,8 @@ function AuditLogTable() {
       </div>
 
       {/* FOOTER DAN PAGINATION */}
-      <div className="flex flex-col gap-3 border-t border-aira-primary/[0.06] px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-        <p className="text-xs text-aira-text/55 sm:text-sm">
+      <div className="flex flex-col gap-3 border-t border-aira-primary/[0.08] px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+        <p className="text-xs text-aira-text/55">
           Menampilkan {logs.length} dari{" "}
           {Number(pagination.total_data || 0).toLocaleString("id-ID")} aktivitas
         </p>
@@ -647,13 +642,9 @@ function AuditLogTable() {
         <div className="flex items-center gap-2">
           <button
             type="button"
-            disabled={
-              loading ||
-              !pagination.has_previous_page ||
-              page <= 1
-            }
+            disabled={loading || !pagination.has_previous_page || page <= 1}
             onClick={() => setPage((current) => Math.max(1, current - 1))}
-            className="inline-flex items-center gap-1 rounded-lg border border-aira-primary/20 px-3 py-2 text-xs font-semibold text-aira-primary transition-colors hover:bg-aira-sage/20 disabled:cursor-not-allowed disabled:opacity-40"
+            className={adminBtnSm}
           >
             <ChevronLeft className="size-4" />
             Sebelumnya
@@ -668,7 +659,7 @@ function AuditLogTable() {
             type="button"
             disabled={loading || !pagination.has_next_page}
             onClick={() => setPage((current) => current + 1)}
-            className="inline-flex items-center gap-1 rounded-lg border border-aira-primary/20 px-3 py-2 text-xs font-semibold text-aira-primary transition-colors hover:bg-aira-sage/20 disabled:cursor-not-allowed disabled:opacity-40"
+            className={adminBtnSm}
           >
             Selanjutnya
             <ChevronRight className="size-4" />
@@ -680,52 +671,48 @@ function AuditLogTable() {
 }
 
 // ============================================
-// HALAMAN DASHBOARD ADMIN
+// HALAMAN DASHBOARD ADMIN (C01)
 // ============================================
 
 export default function AdminDashboard() {
+  const [showUsers, setShowUsers] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const closeUsers = useCallback(() => setShowUsers(false), []);
+  const refreshData = useCallback(() => setRefreshKey((key) => key + 1), []);
+
   return (
-    <main className="min-h-screen scroll-smooth bg-aira-bg"> 
-      <div className="mx-auto grid w-full max-w-[1280px] grid-cols-1 items-start gap-6 px-4 py-6 sm:px-5 lg:grid-cols-[250px_minmax(0,1fr)]">
-        {/* SIDEBAR */}
-        <AdminSidebar admin={MOCK_ADMIN} />
+    <>
+      <AdminShell admin={MOCK_ADMIN}>
+        <AdminPageHeader
+          title="Ringkasan & Riwayat"
+          description="Pantau aktivitas pengelolaan data titik air, kontribusi warga, pengguna, dan status verifikasi dalam satu halaman."
+        />
 
-        {/* KONTEN UTAMA */}
-        <div className="min-w-0 space-y-5">
-          <header className="space-y-1.5">
-            <div className="flex items-center gap-2 text-xs font-medium text-aira-primary/65">
-              <span>Panel Admin</span>
-              <span>/</span>
-              <span>Ringkasan & Riwayat</span>
-            </div>
+        {/* STATISTIK TITIK AIR DAN AKTIVITAS */}
+        <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {MOCK_ADMIN_STATS.map((stat) => (
+            <AdminStatCard key={stat.id} stat={stat} />
+          ))}
+        </section>
 
-            <h1 className="text-2xl font-bold tracking-tight text-aira-primary sm:text-3xl">
-              Ringkasan & Riwayat
-            </h1>
+        {/* STATISTIK PENGGUNA DARI SUPABASE */}
+        <AdminUserStatistics
+          refreshKey={refreshKey}
+          onManage={() => setShowUsers(true)}
+        />
 
-            <p className="max-w-2xl text-sm leading-relaxed text-aira-text/65">
-              Pantau aktivitas pengelolaan data titik air, kontribusi warga,
-              pengguna, dan status verifikasi dalam satu halaman.
-            </p>
-          </header>
+        {/* STATUS KONTRIBUSI */}
+        <ContributionStatus />
 
-          {/* STATISTIK TITIK AIR DAN AKTIVITAS */}
-          <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {MOCK_ADMIN_STATS.map((stat) => (
-              <AdminStatCard key={stat.id} stat={stat} />
-            ))}
-          </section>
+        {/* RIWAYAT AKTIVITAS DARI SUPABASE */}
+        <AuditLogTable refreshKey={refreshKey} />
+      </AdminShell>
 
-          {/* STATISTIK PENGGUNA DARI SUPABASE */}
-          <AdminUserStatistics />
-
-          {/* STATUS KONTRIBUSI */}
-          <ContributionStatus />
-
-          {/* RIWAYAT AKTIVITAS DARI SUPABASE */}
-          <AuditLogTable />
-        </div>
-      </div>
-    </main>
+      {/* PANEL KELOLA STATUS AKUN (bukan screen baru) */}
+      {showUsers && (
+        <UserManagement onClose={closeUsers} onChanged={refreshData} />
+      )}
+    </>
   );
 } 

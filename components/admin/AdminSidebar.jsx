@@ -6,7 +6,6 @@ import {
   LayoutDashboard,
   ClipboardCheck,
   Droplets,
-  Users,
 } from "lucide-react";
 
 const menuItems = [
@@ -24,11 +23,6 @@ const menuItems = [
     label: "Kelola Titik Air",
     href: "/admin/kelola-titik-air",
     icon: Droplets,
-  },
-  {
-    label: "Kelola Pengguna",
-    href: "/admin/pengguna",
-    icon: Users,
   },
 ];
 
