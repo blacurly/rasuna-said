@@ -18,6 +18,7 @@ const footerGroups = [
         label: "AIRA Assistant",
         href: "/assistant",
       },
+      { label: "Tentang Kami", href: "/#tentang-kami" },
     ],
   },
   {

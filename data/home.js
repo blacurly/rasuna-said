@@ -95,3 +95,27 @@ export const VALUES_CONTENT = {
     },
   ],
 }; 
+export const ABOUT_CONTENT = {
+  id: "tentang-kami",
+  eyebrow: "Tentang Kami",
+  title: "Apa itu AIRA?",
+  paragraphs: [
+    "AIRA (Access, Intelligence, Resilience, Action) adalah platform web yang membantu perempuan dan keluarga di daerah rawan kekeringan memahami kondisi air rumah tangga dan menentukan langkah yang tepat. Lewat Kalkulator Ketahanan Air, Navigasi Air, dan AIRA Assistant, AIRA mengubah informasi air dan sanitasi menjadi tindakan nyata sebelum krisis datang.",
+    "AIRA dikembangkan oleh Tim Rasuna Said sebagai proyek akhir Bootcamp AI Full Stack Web Development Perempuan Inovasi GENerasi AI 2026, dengan tema Air, Sanitasi, dan Ketahanan Iklim.",
+  ],
+  photoCaption: "Foto ilustrasi",
+  mosaic: [
+    { src: "/images/about/air-perempuan.jpg", alt: "Perempuan dan anak mengisi baskom air di stasiun air biru beratap seng", cls: "rounded-[1.25rem_2.5rem_1.25rem_2.5rem]" },
+    { src: "/images/about/air-tangki.webp", alt: "Warga mengisi jeriken dan botol dari tangki air di samping truk", cls: "rounded-[2.5rem_1.25rem_2.5rem_1.25rem]" },
+    { src: "/images/about/air-warga.jpg", alt: "Kerumunan warga mengambil air dari sumur", cls: "rounded-[2.5rem_1.25rem_2.5rem_1.25rem]" },
+    { src: "/images/about/air-keran.png", alt: "Tangan menampung air yang mengalir dari keran", cls: "rounded-[1.25rem_2.5rem_1.25rem_2.5rem]" },
+  ],
+  teamTitle: "Tim Pengembang",
+  teamDesc: "Peserta Bootcamp AI Full Stack Web Development Perempuan Inovasi GENerasi AI 2026.",
+  team: [
+    { name: "Tria Agusti Khoirun Nisa’", role: "Ketua Tim Rasuna Said", photo: "/images/about/tim-tria.png", lead: true },
+    { name: "Amanda Putri", role: "Anggota Tim Rasuna Said", photo: "/images/about/tim-amanda.png", lead: false },
+    { name: "Reikananta Fauziah Lazuardi", role: "Anggota Tim Rasuna Said", photo: "/images/about/tim-reikananta.png", lead: false },
+    { name: "Siti Hafsoh", role: "Anggota Tim Rasuna Said", photo: "/images/about/tim-hafsoh.png", lead: false },
+  ],
+};
