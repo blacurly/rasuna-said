@@ -8,9 +8,11 @@ import { simpanProfilKeluarga } from "@/app/actions/dashboard";
 import { SUMBER_AIR_PROFIL } from "@/lib/sumberAir";
 
 // Formulir Profil keluarga. `awal` = nilai awal dari data keluarga (database).
-export default function ProfilKeluargaForm({ awal }) {
+// `kosong` = belum ada profil tersimpan (User Baru): kolom kosong dengan placeholder.
+export default function ProfilKeluargaForm({ awal, kosong = false }) {
   const [mhm, setMhm] = useState(awal.anggotaMhm > 0);
-  const [perempuan, setPerempuan] = useState(String(awal.anggotaMhm));
+  const [perempuan, setPerempuan] = useState(String(awal.anggotaMhm ?? ""));
+  const [sumber, setSumber] = useState(awal.sumberAirUtama ?? "");
   const [tersimpan, setTersimpan] = useState(false);
   const [galat, setGalat] = useState("");
   const [menyimpan, setMenyimpan] = useState(false);
@@ -76,32 +78,66 @@ export default function ProfilKeluargaForm({ awal }) {
 
       <div className="grid gap-5 sm:grid-cols-2">
         <Field label="Nama rumah tangga">
-          <input name="household" required defaultValue={awal.namaRumahTangga} className={inputCls} />
+          <input
+            name="household"
+            required
+            defaultValue={awal.namaRumahTangga}
+            placeholder="Contoh: Keluarga Siti Rahma"
+            className={inputCls}
+          />
         </Field>
         <Field label="Desa / kelurahan dan kecamatan">
-          <input name="area" required defaultValue={awal.wilayahDesa} className={inputCls} />
+          <input
+            name="area"
+            required
+            defaultValue={awal.wilayahDesa}
+            placeholder="Contoh: Desa Bohol, Kec. Rongkop"
+            className={inputCls}
+          />
         </Field>
         <Field label="Jumlah anggota keluarga" hint="Isi jumlah orang yang tinggal dalam rumah tangga.">
-          <input name="members" type="number" min={1} required defaultValue={awal.anggota ?? ""} className={inputCls} />
+          <input
+            name="members"
+            type="number"
+            min={1}
+            required
+            defaultValue={awal.anggota ?? ""}
+            placeholder="Contoh: 4"
+            className={inputCls}
+          />
         </Field>
         <Field
           label="Perempuan usia subur"
-          hint={mhm ? "Opsional; digunakan bila kebutuhan MHM disertakan." : "Aktifkan kebutuhan MHM untuk mengisi"}
+          hint={mhm || kosong ? "Opsional; digunakan bila kebutuhan MHM disertakan." : "Aktifkan kebutuhan MHM untuk mengisi"}
         >
           <input
             name="women"
             type="number"
             min={0}
-            value={mhm ? perempuan : "0"}
+            value={mhm ? perempuan : kosong ? "" : "0"}
+            placeholder="Contoh: 2"
             disabled={!mhm}
             onChange={(e) => setPerempuan(e.target.value)}
             className={`${inputCls} ${mhm ? "" : "cursor-not-allowed bg-aira-sand/60 text-aira-text/50"}`}
           />
         </Field>
         <Field label="Sumber air utama">
-          <select name="source" defaultValue={awal.sumberAirUtama} className={inputCls}>
+          <select
+            name="source"
+            required
+            value={sumber}
+            onChange={(e) => setSumber(e.target.value)}
+            className={`${inputCls} ${sumber === "" ? "text-aira-text/50" : ""}`}
+          >
+            {kosong && (
+              <option value="" disabled>
+                Pilih sumber air
+              </option>
+            )}
             {SUMBER_AIR_PROFIL.map((s) => (
-              <option key={s}>{s}</option>
+              <option key={s} className="text-aira-text">
+                {s}
+              </option>
             ))}
           </select>
         </Field>
@@ -111,6 +147,7 @@ export default function ProfilKeluargaForm({ awal }) {
             type="number"
             min={0}
             defaultValue={awal.kapasitasTandonLiter}
+            placeholder="Contoh: 1000"
             className={inputCls}
           />
         </Field>
@@ -118,7 +155,7 @@ export default function ProfilKeluargaForm({ awal }) {
 
       <div className="flex items-center gap-4 rounded-2xl bg-aira-warm p-5">
         <div className="flex-1">
-          <p className="text-[15px] font-semibold">Sertakan kebutuhan MHM</p>
+          <p className="text-[15px] font-semibold leading-normal">Sertakan kebutuhan MHM</p>
           <p className="mt-1 text-sm text-aira-text/70">Menambah 5 liter per orang per hari pada perhitungan.</p>
         </div>
         <Toggle on={mhm} onChange={setMhm} label="Sertakan kebutuhan MHM" />

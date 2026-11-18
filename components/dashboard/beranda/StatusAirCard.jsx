@@ -79,7 +79,7 @@ export default function StatusAirCard({ status, catatan, keluarga, tanggalSingka
       </dl>
 
       <div className="mt-5 rounded-2xl bg-white/70 p-5">
-        <p className="font-semibold text-aira-primary">Langkah berikutnya</p>
+        <p className="font-semibold leading-normal text-aira-primary">Langkah berikutnya</p>
         <p className="mt-1 text-sm text-aira-text/75">
           {krisis
             ? "Prioritaskan kebutuhan dasar dan periksa sumber air alternatif beserta panduan krisis."

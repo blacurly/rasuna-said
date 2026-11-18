@@ -2,12 +2,28 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, ClipboardCheck, Droplets } from "lucide-react";
+import {
+  LayoutDashboard,
+  ClipboardCheck,
+  Droplets,
+} from "lucide-react";
 
 const menuItems = [
-  { label: "Ringkasan & Riwayat", href: "/admin", icon: LayoutDashboard },
-  { label: "Verifikasi Kontribusi", href: "/admin/verifikasi", icon: ClipboardCheck },
-  { label: "Kelola Titik Air", href: "/admin/kelola-titik-air", icon: Droplets },
+  {
+    label: "Ringkasan & Riwayat",
+    href: "/admin",
+    icon: LayoutDashboard,
+  },
+  {
+    label: "Verifikasi Kontribusi",
+    href: "/admin/verifikasi",
+    icon: ClipboardCheck,
+  },
+  {
+    label: "Kelola Titik Air",
+    href: "/admin/kelola-titik-air",
+    icon: Droplets,
+  },
 ];
 
 export default function AdminSidebar({ admin }) {
@@ -42,7 +58,8 @@ export default function AdminSidebar({ admin }) {
           const isActive =
             item.href === "/admin"
               ? pathname === "/admin"
-              : pathname === item.href || pathname.startsWith(`${item.href}/`);
+              : pathname === item.href ||
+                pathname.startsWith(`${item.href}/`);
 
           return (
             <Link

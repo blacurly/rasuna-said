@@ -1,7 +1,6 @@
 import HeroDashboard from "@/components/dashboard/beranda/HeroDashboard";
 import MenuCepat from "@/components/dashboard/beranda/MenuCepat";
 import StatusAirCard from "@/components/dashboard/beranda/StatusAirCard";
-import StatusAirKosong from "@/components/dashboard/beranda/StatusAirKosong";
 import { ambilProfilDashboard } from "@/lib/dashboardProfile";
 import { hitungStatusDashboard } from "@/lib/statusDashboard";
 import { formatTanggalIso, salamWaktu, tanggalLengkap } from "@/lib/waktuDashboard";
@@ -11,7 +10,7 @@ export const metadata = {
   title: "Dashboard - AIRA",
 };
 
-// B01 - Dashboard User. Data sementara dari services/dashboardService.js (simulasi).
+// B01 - Dashboard User. Dua versi: User Baru (belum ada catatan) dan User Lama (sudah ada catatan).
 export default async function DashboardPage() {
   const profile = await ambilProfilDashboard();
   const { keluarga, catatan, kontribusi } = await ambilDataDashboard();
@@ -34,9 +33,11 @@ export default async function DashboardPage() {
         tanggal={tanggalLengkap()}
         salam={salamWaktu()}
         nama={profile.full_name || "Pengguna AIRA"}
+        baru={!terbaru}
       />
 
-      {terbaru && status ? (
+      {/* User Baru (belum ada catatan): kartu status tidak ditampilkan. */}
+      {terbaru && status && (
         <StatusAirCard
           status={status}
           catatan={terbaru}
@@ -44,8 +45,6 @@ export default async function DashboardPage() {
           tanggalSingkat={tanggal.tanggalSingkat}
           tanggalPenuh={tanggal.tanggalPenuh}
         />
-      ) : (
-        <StatusAirKosong />
       )}
 
       <MenuCepat

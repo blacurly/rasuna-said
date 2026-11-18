@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { updatePassword } from "@/app/actions/auth";
 
-export default function ResetPassword() {
+export default function ResetPassword({ tokenHash = "" }) {
   const router = useRouter();
 
   const [password, setPassword] = useState("");
@@ -30,6 +31,7 @@ export default function ResetPassword() {
 
     formData.set("password", password);
     formData.set("confirm_password", confirmPassword);
+    if (tokenHash) formData.set("token_hash", tokenHash);
 
     startTransition(async () => {
       const result = await updatePassword(formData);
@@ -105,6 +107,21 @@ export default function ResetPassword() {
       >
         {isPending ? "Memperbarui..." : "Simpan password baru"}
       </button>
+
+      <p className="text-center text-sm">
+        {error ? (
+          <Link
+            href="/masuk?forgot=1"
+            className="font-semibold text-aira-primary underline"
+          >
+            Minta tautan reset baru
+          </Link>
+        ) : (
+          <Link href="/masuk" className="font-semibold text-aira-primary underline">
+            Kembali ke halaman masuk
+          </Link>
+        )}
+      </p>
     </form>
   );
 }

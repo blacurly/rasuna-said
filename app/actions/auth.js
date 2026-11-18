@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 
 // ==========================================
@@ -32,6 +33,20 @@ function getSiteUrl() {
   }
 
   return "http://localhost:3000";
+}
+
+// Alamat situs dari request yang sedang berjalan (production, preview, atau local).
+// Cadangannya getSiteUrl(). Supabase tetap memvalidasi redirectTo terhadap daftar Redirect URLs.
+async function getRequestOrigin() {
+  const h = await headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host");
+
+  if (!host) return getSiteUrl();
+
+  const isLocal = host.startsWith("localhost") || host.startsWith("127.0.0.1");
+  const proto = h.get("x-forwarded-proto")?.split(",")[0].trim() ?? (isLocal ? "http" : "https");
+
+  return `${proto}://${host}`;
 }
 
 function createCallbackUrl(nextPath) {
@@ -359,9 +374,10 @@ export async function resetPassword(formData) {
 
   const supabase = await createClient();
 
-  const redirectTo = createCallbackUrl(
-    "/masuk/reset-password"
-  );
+  // Tautan di email mengarah langsung ke halaman reset password (bukan /auth/callback),
+  // sehingga pengguna tidak pernah mendapat sesi login sebelum sandinya diganti.
+  // Template email "Reset Password" di Supabase memakai {{ .RedirectTo }}?token_hash=...
+  const redirectTo = `${await getRequestOrigin()}/masuk/reset-password`;
 
   const { error } =
     await supabase.auth.resetPasswordForEmail(email, {
@@ -400,6 +416,12 @@ export async function updatePassword(formData) {
     formData.get("confirm_password") || ""
   );
 
+  // Token dari tautan email. Tanpa token berarti tautan lama (PKCE) yang sudah membuat
+  // sesi pemulihan; jalur itu dipertahankan agar email yang sudah terkirim tetap berfungsi.
+  const tokenHash = String(
+    formData.get("token_hash") || ""
+  ).trim();
+
   if (password.length < 8) {
     return {
       error: "Password baru minimal 8 karakter.",
@@ -413,6 +435,27 @@ export async function updatePassword(formData) {
   }
 
   const supabase = await createClient();
+
+  if (tokenHash) {
+    // Sesi dibuat di sini, tepat sebelum sandi diganti, lalu langsung diakhiri di bawah.
+    const { error: otpError } = await supabase.auth.verifyOtp({
+      type: "recovery",
+      token_hash: tokenHash,
+    });
+
+    if (otpError) {
+      console.error("VERIFY RECOVERY ERROR:", {
+        message: otpError.message,
+        code: otpError.code,
+        status: otpError.status,
+      });
+
+      return {
+        error:
+          "Tautan reset password tidak valid, sudah kedaluwarsa, atau sudah pernah digunakan. Silakan minta tautan baru.",
+      };
+    }
+  }
 
   // PASTIKAN SESSION PEMULIHAN TERSEDIA
   const {
@@ -438,12 +481,29 @@ export async function updatePassword(formData) {
       status: error.status,
     });
 
+    if (tokenHash) {
+      // Token sudah terpakai oleh verifyOtp, jadi jangan tinggalkan sesi login.
+      await supabase.auth.signOut();
+
+      const sebab =
+        error.code === "same_password"
+          ? "Password baru tidak boleh sama dengan password lama."
+          : error.code === "weak_password"
+            ? "Password terlalu lemah."
+            : "Password gagal diperbarui.";
+
+      return {
+        error: `${sebab} Tautan ini sudah terpakai, silakan minta tautan reset baru.`,
+      };
+    }
+
     return {
       error:
         "Password gagal diperbarui. Silakan coba kembali.",
     };
   }
 
+  // Akhiri sesi: pengguna harus masuk lagi dengan email dan password baru.
   await supabase.auth.signOut();
 
   return {

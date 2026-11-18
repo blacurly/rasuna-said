@@ -193,6 +193,7 @@
   /* ========================================= */
 
   html {
+    scrollbar-gutter: stable; /* cegah layout bergeser saat scrollbar muncul/hilang */
     overflow-x: clip;
     scroll-behavior: smooth;
     -webkit-text-size-adjust: 100%;

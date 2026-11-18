@@ -227,6 +227,20 @@ export default function KalkulatorForm({ awal = null }) {
 
       assessment_notes:
         hasil.alasanStatus ?? null,
+
+      // Snapshot masukan agar riwayat tetap menampilkan data saat perhitungan dibuat
+      // (bukan profil rumah tangga terbaru). Dibaca oleh services/dashboardService.js.
+      input_snapshot: {
+        sumber: "kalkulator",
+        lokasi: input.lokasi ?? "",
+        anggota: Number(input.anggota),
+        anggotaMhm: input.mhm ? Number(input.anggotaMhm) : 0,
+        sumberAir: input.sumberAir,
+        kondisi: input.kondisi,
+        kapasitas: Number(input.kapasitas),
+        persen: Number(input.persen),
+        luasAtap: input.luasAtap === "" ? 0 : Number(input.luasAtap),
+      },
     };
 
     // Panggil fungsi database.

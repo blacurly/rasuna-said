@@ -2,7 +2,7 @@ import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { hitungKetahananAir } from "@/services/calculatorService";
 import { formatLokasiWilayah } from "@/lib/formatWilayah";
-import { hitungKebutuhanHarian } from "@/lib/statusDashboard";
+import { hitungKebutuhanHarian, hitungStatusDashboard } from "@/lib/statusDashboard";
 import { sumberKeKalkulator } from "@/lib/sumberAir";
 import { formatTanggalIso } from "@/lib/waktuDashboard";
 import {
@@ -21,6 +21,10 @@ const STATUS_DB = {
 };
 
 const BATAS_TITIK_GRAFIK = 8;
+const BATAS_CATATAN = 20;
+
+// Penulisan kondisi sumber air pada tampilan Kalkulator.
+const kondisiKalkulator = (k) => (k === "Tidak berfungsi" ? "Tidak Berfungsi" : k);
 
 // Data halaman Monitoring Kondisi Air.
 // Setiap pembaruan (kalkulator maupun catatan manual) adalah satu titik pada grafik.
@@ -28,16 +32,17 @@ export const ambilDataMonitoring = cache(async () => {
   const { household: h, entri } = await muatDataUser();
   const terbaru = entri[0] ?? null;
 
-  if (!h || !terbaru) return { adaData: false };
+  // User Baru: belum ada catatan kondisi air.
+  if (!terbaru) return { adaData: false };
 
-  const anggota = Number(h.member_count ?? terbaru.anggota);
-  const anggotaMhm = h.has_mhm ? Number(h.mhm_member_count ?? 0) : 0;
+  const anggota = Number(h?.member_count ?? terbaru.anggota);
+  const anggotaMhm = h ? (h.has_mhm ? Number(h.mhm_member_count ?? 0) : 0) : terbaru.anggotaMhm;
   const kebutuhan = hitungKebutuhanHarian(anggota, anggotaMhm);
-  const kapasitas = Number(h.tank_capacity_liters ?? terbaru.kapasitasTandonLiter ?? 0);
+  const kapasitas = Number(h?.tank_capacity_liters ?? terbaru.kapasitasTandonLiter ?? 0);
 
   const volume =
     terbaru.persen ??
-    (h.water_volume_percentage != null
+    (h?.water_volume_percentage != null
       ? Number(h.water_volume_percentage)
       : kapasitas > 0
         ? Math.round((terbaru.liter / kapasitas) * 100)
@@ -49,10 +54,45 @@ export const ambilDataMonitoring = cache(async () => {
     .map((e) => ({
       id: e.id,
       date: formatTanggalIso(tanggalIsoWib(e.iso)).tanggalSingkat,
-      value: Number(
-        (e.hari ?? (kebutuhan > 0 ? e.liter / kebutuhan : 0)).toFixed(1)
-      ),
+      // Tidak dibulatkan: rata-rata paruh awal/akhir dihitung dari nilai asli (dibulatkan saat ditampilkan).
+      value: e.hari ?? (kebutuhan > 0 ? e.liter / kebutuhan : 0),
+      liter: e.liter,
     }));
+
+  // Daftar "Catatan Anda": terbaru lebih dulu, status dihitung dari data tiap catatan.
+  const daftarCatatan = entri.slice(0, BATAS_CATATAN).map((e) => {
+    const st = hitungStatusDashboard({
+      liter: e.liter,
+      anggota: e.anggota || anggota,
+      anggotaMhm: e.anggotaMhm,
+      kondisiSumberAir: e.kondisiSumberAir,
+    });
+    const tgl = formatTanggalIso(tanggalIsoWib(e.iso));
+
+    return {
+      id: e.id,
+      tanggal: tgl.tanggalPenuh,
+      waktu: waktuWib(e.iso),
+      catatan: e.catatan || (e.sumber === "kalkulator" ? "Hasil perhitungan kalkulator" : "Pembaruan manual"),
+      liter: e.liter,
+      hari: e.hari ?? st.hari,
+      statusLabel: st.tampilan.label.split(" / ")[0],
+      statusChip: st.tampilan.chip,
+    };
+  });
+
+  // Data untuk tombol "Buka kalkulator dengan data ini" (mengisi draft Kalkulator).
+  const draftKalkulator = {
+    lokasi: terbaru.lokasi || lokasiDariRumah(h),
+    anggota,
+    sumberAir: sumberKeKalkulator(terbaru.sumberAir || h?.water_source_type),
+    kondisi: kondisiKalkulator(terbaru.kondisiSumberAir),
+    kapasitas: String(kapasitas),
+    persen: Math.min(100, Math.max(0, Math.round(volume / 5) * 5)),
+    mhm: anggotaMhm > 0,
+    anggotaMhm,
+    luasAtap: terbaru.luasAtap ? String(terbaru.luasAtap) : "",
+  };
 
   const kondisi = terbaru.kondisiSumberAir;
   const lokasi = terbaru.lokasi || lokasiDariRumah(h);
@@ -73,6 +113,10 @@ export const ambilDataMonitoring = cache(async () => {
     note: terbaru.catatan,
     lastUpdate: `${formatTanggalIso(tanggalIsoWib(terbaru.iso)).tanggalPenuh}, ${waktuWib(terbaru.iso)}`,
     chartData,
+    daftarCatatan,
+    totalCatatan: entri.length,
+    draftKalkulator,
+    kebutuhanHarian: kebutuhan,
     anggota,
     anggotaMhm,
     kondisiSumberAir: kondisi,
