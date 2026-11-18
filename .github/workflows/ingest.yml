@@ -1,6 +1,7 @@
 name: AIRA Ingestion
 
 on:
+  # Menjalankan workflow secara manual
   workflow_dispatch:
     inputs:
       force_reprocess:
@@ -10,15 +11,16 @@ on:
         default: false
 
       maks_dokumen:
-        description: "Batas jumlah dokumen (kosongkan untuk semua)"
+        description: "Batas jumlah dokumen yang diproses (kosongkan untuk semua)"
         type: string
         required: false
         default: ""
 
+  # Menjalankan otomatis setiap hari pukul 02.00 WIB
   schedule:
-    # Setiap hari pukul 02.00 WIB (19.00 UTC)
     - cron: "0 19 * * *"
 
+# Mencegah dua ingestion berjalan bersamaan
 concurrency:
   group: aira-ingestion
   cancel-in-progress: false
@@ -28,7 +30,10 @@ permissions:
 
 jobs:
   ingest:
+    name: AIRA Document Ingestion
     runs-on: ubuntu-latest
+
+    # Batas maksimal waktu workflow
     timeout-minutes: 120
 
     defaults:
@@ -36,11 +41,11 @@ jobs:
         working-directory: pipeline
 
     steps:
-      # 1. Mengambil source code repository
+      # 1. Checkout repository
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. Menyiapkan Python
+      # 2. Setup Python
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -48,63 +53,137 @@ jobs:
           cache: pip
           cache-dependency-path: pipeline/requirements.txt
 
-      # 3. Memvalidasi GitHub Secrets
-      - name: Validate Supabase environment
+      # 3. Validasi GitHub Secrets
+      - name: Validate environment variables
+        shell: bash
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
-          if [ -z "$GEMINI_API_KEY" ]; then
-            echo "::error::GEMINI_API_KEY belum tersedia di GitHub Secrets."
+          set -e
+
+          if [[ -z "$NEXT_PUBLIC_SUPABASE_URL" ]]; then
+            echo "::error::SUPABASE_URL belum tersedia di GitHub Secrets."
             exit 1
           fi
 
-          if [ -z "$NEXT_PUBLIC_SUPABASE_URL" ]; then
-            echo "::error::NEXT_PUBLIC_SUPABASE_URL belum tersedia di GitHub Secrets."
-            exit 1
-          fi
-
-          if [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+          if [[ -z "$SUPABASE_SERVICE_ROLE_KEY" ]]; then
             echo "::error::SUPABASE_SERVICE_ROLE_KEY belum tersedia di GitHub Secrets."
             exit 1
           fi
 
-          echo "Supabase environment variables tersedia."
+          if [[ -z "$GEMINI_API_KEY" ]]; then
+            echo "::error::GEMINI_API_KEY belum tersedia di GitHub Secrets."
+            exit 1
+          fi
 
-      # 4. Instalasi Tesseract OCR
+          echo "Semua GitHub Secrets tersedia."
+
+      # 4. Install Tesseract OCR
       - name: Install Tesseract OCR
         run: |
           sudo apt-get update -qq
+
           sudo apt-get install -y -qq \
             tesseract-ocr \
             tesseract-ocr-ind \
             tesseract-ocr-eng
 
-      # 5. Instalasi seluruh dependency Python
+      # 5. Install Python dependencies
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
 
-      # 6. Memvalidasi instalasi dependency
+      # 6. Verifikasi dependency
       - name: Verify Python dependencies
         run: |
-          python -c "import gdown, pymupdf, pytesseract, PIL, supabase; from google import genai; print('Semua dependency berhasil diimpor.')"
+          python -u -c "
+          import gdown
+          import pymupdf
+          import pytesseract
+          import PIL
+          import supabase
+          from google import genai
+          from google.genai import types
+
+          print('Semua dependency Python berhasil diimpor.', flush=True)
+          "
+
+          echo "Memeriksa Tesseract OCR..."
           tesseract --version
 
-      # 7. Menjalankan ingestion
+          echo "Memeriksa bahasa OCR..."
+          tesseract --list-langs
+
+      # 7. Menentukan konfigurasi ingestion
+      - name: Configure ingestion
+        id: config
+        shell: bash
+        env:
+          INPUT_FORCE: ${{ inputs.force_reprocess }}
+          INPUT_LIMIT: ${{ inputs.maks_dokumen }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            FORCE="${INPUT_FORCE:-false}"
+            LIMIT="${INPUT_LIMIT:-}"
+          else
+            FORCE="false"
+            LIMIT=""
+          fi
+
+          if [[ "$FORCE" != "true" && "$FORCE" != "false" ]]; then
+            echo "::error::Nilai force_reprocess tidak valid."
+            exit 1
+          fi
+
+          if [[ -n "$LIMIT" ]]; then
+            if ! [[ "$LIMIT" =~ ^[1-9][0-9]*$ ]]; then
+              echo "::error::maks_dokumen harus berupa bilangan bulat positif."
+              exit 1
+            fi
+          fi
+
+          echo "force_reprocess=$FORCE" >> "$GITHUB_OUTPUT"
+          echo "maks_dokumen=$LIMIT" >> "$GITHUB_OUTPUT"
+
+          echo "Konfigurasi ingestion:"
+          echo "Force reprocess: $FORCE"
+
+          if [[ -n "$LIMIT" ]]; then
+            echo "Batas dokumen: $LIMIT"
+          else
+            echo "Batas dokumen: Semua dokumen"
+          fi
+
+      # 8. Menjalankan ingestion
       - name: Run ingestion
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
 
-          FORCE_REPROCESS: ${{ github.event.inputs.force_reprocess || 'false' }}
-          MAKS_DOKUMEN: ${{ github.event.inputs.maks_dokumen || '' }}
+          FORCE_REPROCESS: ${{ steps.config.outputs.force_reprocess }}
+          MAKS_DOKUMEN: ${{ steps.config.outputs.maks_dokumen }}
 
           EMBEDDING_MODEL_NAME: gemini-embedding-001
           EMBEDDING_DIMENSION: "768"
 
+          # Memastikan log Python langsung ditampilkan
+          PYTHONUNBUFFERED: "1"
+
         run: |
-          python ingest.py
+          echo "=========================================="
+          echo "MEMULAI AIRA DOCUMENT INGESTION"
+          echo "=========================================="
+
+          echo "Waktu mulai: $(date -u)"
+
+          python -u ingest.py
+
+          echo "=========================================="
+          echo "PROSES INGESTION SELESAI"
+          echo "Waktu selesai: $(date -u)"
+          echo "=========================================="
