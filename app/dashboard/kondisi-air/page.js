@@ -7,8 +7,7 @@ import { ambilProfilDashboard } from "@/lib/dashboardProfile";
 import { hitungStatusDashboard } from "@/lib/statusDashboard";
 import { formatTanggalIso } from "@/lib/waktuDashboard";
 
-import { ambilDataDashboard, tanggalIsoWib, waktuWib } from "@/services/dashboardService";
-import { ambilRiwayatKalkulator } from "@/app/actions/riwayat";
+import { ambilDataDashboard } from "@/services/dashboardService";
 
 export const metadata = {
   title: "Kondisi Air Rumah Tangga - AIRA",
@@ -20,17 +19,13 @@ export default async function KondisiAirRumahTanggaPage() {
   const profile = await ambilProfilDashboard();
 
   // Data keluarga dan catatan ringkasan tetap menggunakan sumber sebelumnya.
+  // `riwayat` = catatan asal Kalkulator. Datanya sudah digabung dari input_snapshot
+  // dan tabel households (asesmen yang disimpan lewat RPC tidak punya snapshot).
   const {
     keluarga,
     catatan,
+    riwayat: dataRiwayat,
   } = await ambilDataDashboard();
-
-  // Ambil riwayat kalkulator dari Supabase berdasarkan pengguna yang login.
-  const hasilRiwayat = await ambilRiwayatKalkulator();
-
-  const dataRiwayat = hasilRiwayat.ok
-    ? hasilRiwayat.data
-    : [];
 
   // Ringkasan tetap memakai catatan terbaru dari dashboard.
   const terbaru = catatan[0] ?? null;
@@ -48,53 +43,17 @@ export default async function KondisiAirRumahTanggaPage() {
     ? formatTanggalIso(terbaru.tanggal)
     : null;
 
-  // Ubah data database menjadi format yang dibutuhkan RiwayatPerhitungan.
-  const baris = dataRiwayat.map((r) => {
-    const snapshot = r.input_snapshot ?? {};
-    const masukan = snapshot.input ?? {};
-
-    const anggota = Number(masukan.anggota ?? 0);
-    const anggotaMhm = masukan.mhm
-      ? Number(masukan.anggotaMhm ?? 0)
-      : 0;
-
-    const kondisiSumberAir =
-      r.water_condition || masukan.kondisi || "Belum diketahui";
-
-    const liter = Number(r.available_water_liters ?? 0);
-
-    // assessed_at berupa timestamp lengkap: ambil tanggal dan jam dalam zona WIB.
-    const tanggalRiwayat = formatTanggalIso(tanggalIsoWib(r.assessed_at));
-
-    return {
-      id: r.assessment_id,
-
-      tanggalPenuh: tanggalRiwayat.tanggalPenuh,
-      waktu: waktuWib(r.assessed_at),
-
-      lokasi: masukan.lokasi || "",
-      sumberAir: masukan.sumberAir || "",
-
-      kondisiSumberAir,
-
-      anggota,
-      anggotaMhm,
-      luasAtap: masukan.luasAtap
-        ? Number(masukan.luasAtap)
-        : 0,
-
-      liter,
-
-      kapasitasTandonLiter: Number(masukan.kapasitas ?? 0),
-
-      status: hitungStatusDashboard({
-        liter,
-        anggota,
-        anggotaMhm,
-        kondisiSumberAir,
-      }),
-    };
-  });
+  // Tambahkan tanggal tampil dan status ketahanan untuk setiap catatan.
+  const baris = dataRiwayat.map((r) => ({
+    ...r,
+    tanggalPenuh: formatTanggalIso(r.tanggal).tanggalPenuh,
+    status: hitungStatusDashboard({
+      liter: r.liter,
+      anggota: r.anggota,
+      anggotaMhm: r.anggotaMhm,
+      kondisiSumberAir: r.kondisiSumberAir,
+    }),
+  }));
 
   // User Baru: belum ada catatan kondisi air (B02 versi User Baru).
   const baru = !terbaru;
