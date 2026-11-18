@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from "react";
 import {
   Search,
   RefreshCw,
-  Users,
   ChevronLeft,
   ChevronRight,
   Eye,
@@ -20,8 +19,13 @@ import {
   Ban,
 } from "lucide-react";
 
-import AdminSidebar from "@/components/admin/AdminSidebar";
-import { MOCK_ADMIN } from "@/data/admin/mockAdmin";
+import {
+  adminTh,
+  adminBtnPrimary,
+  adminBtnOutline,
+  adminBtnSm,
+  adminInput,
+} from "@/components/admin/adminStyles";
 
 /* =========================================
    KONSTANTA
@@ -93,7 +97,7 @@ function UserStatusBadge({ status }) {
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-semibold ${
+      className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold leading-none ${
         styles[status] || "bg-gray-100 text-gray-600"
       }`}
     >
@@ -110,7 +114,7 @@ function UserStatusBadge({ status }) {
 function UserRoleBadge({ role }) {
   return (
     <span
-      className={`inline-flex rounded-full px-3 py-1.5 text-xs font-semibold ${
+      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold leading-none ${
         role === "admin"
           ? "bg-[#E0EDF7] text-[#28658A]"
           : "bg-gray-100 text-gray-600"
@@ -125,11 +129,7 @@ function UserRoleBadge({ role }) {
    KOMPONEN DETAIL PENGGUNA
 ========================================= */
 
-function UserDetailModal({
-  userId,
-  onClose,
-  onStatusUpdated,
-}) {
+function UserDetailModal({ userId, onClose, onStatusUpdated }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -186,19 +186,16 @@ function UserDetailModal({
       setUpdating(true);
       setUpdateMessage("");
 
-      const response = await fetch(
-        `/api/admin/users/${userId}/status`,
-        {
-          method: "PATCH",
-          credentials: "same-origin",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            account_status: selectedStatus,
-          }),
-        }
-      );
+      const response = await fetch(`/api/admin/users/${userId}/status`, {
+        method: "PATCH",
+        credentials: "same-origin",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          account_status: selectedStatus,
+        }),
+      });
 
       const result = await response.json();
 
@@ -225,7 +222,7 @@ function UserDetailModal({
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
@@ -234,16 +231,16 @@ function UserDetailModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="user-detail-title"
-        className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-[22px] bg-white shadow-2xl"
+        className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-2xl"
       >
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-aira-primary/10 bg-white px-5 py-4 sm:px-6">
           <div>
-            <p className="text-xs font-medium text-aira-primary/60">
+            <p className="text-xs font-semibold uppercase tracking-wider text-aira-primary/70">
               Manajemen Pengguna
             </p>
             <h2
               id="user-detail-title"
-              className="mt-1 text-lg font-bold text-aira-primary"
+              className="mt-1 text-xl font-bold text-aira-primary"
             >
               Detail akun pengguna
             </h2>
@@ -253,7 +250,7 @@ function UserDetailModal({
             type="button"
             onClick={onClose}
             aria-label="Tutup detail pengguna"
-            className="rounded-full p-2 text-aira-text/60 transition hover:bg-aira-bg hover:text-aira-primary"
+            className="rounded-full p-2 text-aira-text/50 transition hover:bg-aira-bg hover:text-aira-primary"
           >
             <X className="size-5" />
           </button>
@@ -281,7 +278,7 @@ function UserDetailModal({
 
           {!loading && user && (
             <>
-              <div className="flex flex-col gap-4 rounded-2xl bg-aira-bg p-5 sm:flex-row sm:items-center">
+              <div className="flex flex-col gap-4 rounded-xl bg-aira-bg p-4 sm:flex-row sm:items-center">
                 <div className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-white text-aira-primary shadow-sm">
                   <UserRound className="size-7" />
                 </div>
@@ -369,7 +366,7 @@ function UserDetailModal({
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-aira-primary/10 p-4 sm:p-5">
+              <div className="rounded-xl border border-aira-primary/10 p-4 sm:p-5">
                 <h3 className="text-sm font-semibold text-aira-primary">
                   Pengelolaan status akun
                 </h3>
@@ -383,11 +380,9 @@ function UserDetailModal({
                 <div className="mt-4 flex flex-col gap-3 sm:flex-row">
                   <select
                     value={selectedStatus}
-                    onChange={(event) =>
-                      setSelectedStatus(event.target.value)
-                    }
+                    onChange={(event) => setSelectedStatus(event.target.value)}
                     disabled={updating}
-                    className="min-h-11 flex-1 rounded-xl border border-aira-primary/15 bg-white px-3 text-sm text-aira-text outline-none focus:border-aira-primary"
+                    className={`${adminInput} flex-1`}
                   >
                     {STATUS_OPTIONS.map((option) => (
                       <option key={option.value} value={option.value}>
@@ -399,15 +394,10 @@ function UserDetailModal({
                   <button
                     type="button"
                     onClick={handleStatusUpdate}
-                    disabled={
-                      updating ||
-                      selectedStatus === user.account_status
-                    }
-                    className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-aira-primary px-5 text-sm font-semibold text-white transition hover:bg-aira-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={updating || selectedStatus === user.account_status}
+                    className={adminBtnPrimary}
                   >
-                    {updating && (
-                      <RefreshCw className="size-4 animate-spin" />
-                    )}
+                    {updating && <RefreshCw className="size-4 animate-spin" />}
                     {updating ? "Menyimpan..." : "Simpan perubahan"}
                   </button>
                 </div>
@@ -423,11 +413,7 @@ function UserDetailModal({
         </div>
 
         <div className="flex justify-end border-t border-aira-primary/10 px-5 py-4 sm:px-6">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-xl border border-aira-primary/20 px-5 py-2.5 text-sm font-semibold text-aira-primary transition hover:bg-aira-bg"
-          >
+          <button type="button" onClick={onClose} className={adminBtnOutline}>
             Tutup
           </button>
         </div>
@@ -437,10 +423,11 @@ function UserDetailModal({
 }
 
 /* =========================================
-   HALAMAN MANAJEMEN PENGGUNA
+   PANEL KELOLA STATUS AKUN
+   (dibuka dari C01, bukan halaman tersendiri)
 ========================================= */
 
-export default function UserManagement() {
+export default function UserManagement({ onClose, onChanged }) {
   const [users, setUsers] = useState([]);
   const [pagination, setPagination] = useState({
     current_page: 1,
@@ -475,25 +462,18 @@ export default function UserManagement() {
 
       if (search.trim()) params.set("search", search.trim());
       if (role) params.set("role", role);
-      if (accountStatus) {
-        params.set("accountStatus", accountStatus);
-      }
+      if (accountStatus) params.set("accountStatus", accountStatus);
 
-      const response = await fetch(
-        `/api/admin/users?${params.toString()}`,
-        {
-          method: "GET",
-          credentials: "same-origin",
-          cache: "no-store",
-        }
-      );
+      const response = await fetch(`/api/admin/users?${params.toString()}`, {
+        method: "GET",
+        credentials: "same-origin",
+        cache: "no-store",
+      });
 
       const result = await response.json();
 
       if (!response.ok || !result.success) {
-        throw new Error(
-          result.message || "Gagal mengambil daftar pengguna."
-        );
+        throw new Error(result.message || "Gagal mengambil daftar pengguna.");
       }
 
       setUsers(Array.isArray(result.data) ? result.data : []);
@@ -518,6 +498,28 @@ export default function UserManagement() {
   useEffect(() => {
     fetchUsers();
   }, [fetchUsers]);
+
+  // Kunci scroll halaman di belakang panel.
+  useEffect(() => {
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, []);
+
+  // Esc menutup panel (kecuali modal detail sedang terbuka).
+  useEffect(() => {
+    if (selectedUserId) return;
+    const onKey = (event) => event.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selectedUserId, onClose]);
+
+  async function handleStatusUpdated() {
+    await fetchUsers();
+    onChanged?.(); // minta C01 memuat ulang statistik dan jejak audit
+  }
 
   function handleSearch(event) {
     event.preventDefault();
@@ -544,154 +546,126 @@ export default function UserManagement() {
   }
 
   return (
-    <main className="min-h-screen bg-aira-bg">
-      <div className="mx-auto grid w-full max-w-[1280px] grid-cols-1 items-start gap-6 px-4 py-6 sm:px-5 lg:grid-cols-[250px_minmax(0,1fr)]">
-        <AdminSidebar admin={MOCK_ADMIN} />
-
-        <div className="min-w-0 space-y-5">
+    <>
+      <div
+        className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm"
+        onMouseDown={(event) => {
+          if (event.target === event.currentTarget) onClose();
+        }}
+      >
+        <section
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="user-management-title"
+          className="flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
+        >
           {/* HEADER */}
-          <header className="space-y-1.5">
-            <div className="flex items-center gap-2 text-xs font-medium text-aira-primary/65">
-              <span>Panel Admin</span>
-              <span>/</span>
-              <span>Kelola Pengguna</span>
+          <div className="flex items-center justify-between gap-3 border-b border-aira-primary/10 px-5 py-4 sm:px-6">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-aira-primary/70">
+                Statistik Pengguna
+              </p>
+              <h2
+                id="user-management-title"
+                className="mt-1 text-xl font-bold text-aira-primary"
+              >
+                Kelola Status Akun
+              </h2>
             </div>
 
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h1 className="text-2xl font-bold tracking-tight text-aira-primary sm:text-3xl">
-                  Kelola Pengguna
-                </h1>
-                <p className="mt-1 max-w-2xl text-sm leading-relaxed text-aira-text/65">
-                  Lihat informasi akun, pantau peran, dan kelola status
-                  pengguna AIRA.
-                </p>
-              </div>
-
+            <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={fetchUsers}
                 disabled={loading}
-                className="inline-flex min-h-10 items-center justify-center gap-2 self-start rounded-xl border border-aira-primary/20 bg-white px-4 text-sm font-semibold text-aira-primary transition hover:bg-aira-bg disabled:opacity-50 sm:self-auto"
+                className={adminBtnSm}
               >
                 <RefreshCw
-                  className={`size-4 ${loading ? "animate-spin" : ""}`}
+                  className={`size-3.5 ${loading ? "animate-spin" : ""}`}
                 />
                 Segarkan
               </button>
-            </div>
-          </header>
 
-          {/* RINGKASAN JUMLAH */}
-          <section className="rounded-[20px] border border-aira-primary/5 bg-white p-5 shadow-[0_8px_28px_-10px_rgba(23,107,120,0.12)]">
-            <div className="flex items-center gap-3">
-              <div className="flex size-11 items-center justify-center rounded-xl bg-[#E0F1F0] text-aira-primary">
-                <Users className="size-5" />
-              </div>
-
-              <div>
-                <p className="text-xs font-medium text-aira-text/60">
-                  Total hasil pengguna
-                </p>
-                <p className="text-2xl font-bold text-aira-primary">
-                  {loading ? "..." : pagination.total_data}
-                </p>
-              </div>
-            </div>
-          </section>
-
-          {/* FILTER DAN PENCARIAN */}
-          <section className="rounded-[20px] border border-aira-primary/5 bg-white p-5 shadow-[0_8px_28px_-10px_rgba(23,107,120,0.12)]">
-            <div className="mb-4">
-              <h2 className="text-base font-semibold text-aira-primary">
-                Pencarian dan filter
-              </h2>
-              <p className="mt-1 text-xs text-aira-text/55">
-                Cari berdasarkan nama atau email, lalu sesuaikan filter.
-              </p>
-            </div>
-
-            <form
-              onSubmit={handleSearch}
-              className="flex flex-col gap-3 sm:flex-row"
-            >
-              <div className="relative min-w-0 flex-1">
-                <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-aira-text/40" />
-                <input
-                  type="search"
-                  value={searchInput}
-                  onChange={(event) => setSearchInput(event.target.value)}
-                  placeholder="Cari nama atau email pengguna..."
-                  className="min-h-11 w-full rounded-xl border border-aira-primary/15 bg-white pl-10 pr-4 text-sm text-aira-text outline-none transition placeholder:text-aira-text/40 focus:border-aira-primary"
-                />
-              </div>
-
-              <button
-                type="submit"
-                className="min-h-11 rounded-xl bg-aira-primary px-5 text-sm font-semibold text-white transition hover:bg-aira-primary/90"
-              >
-                Cari pengguna
-              </button>
-            </form>
-
-            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <select
-                value={role}
-                onChange={(event) => handleRoleChange(event.target.value)}
-                className="min-h-11 rounded-xl border border-aira-primary/15 bg-white px-3 text-sm text-aira-text outline-none focus:border-aira-primary"
-              >
-                {ROLE_OPTIONS.map((option) => (
-                  <option key={option.value || "all"} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-
-              <select
-                value={accountStatus}
-                onChange={(event) =>
-                  handleStatusChange(event.target.value)
-                }
-                className="min-h-11 rounded-xl border border-aira-primary/15 bg-white px-3 text-sm text-aira-text outline-none focus:border-aira-primary"
-              >
-                {STATUS_FILTER_OPTIONS.map((option) => (
-                  <option key={option.value || "all"} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {(search || role || accountStatus) && (
               <button
                 type="button"
-                onClick={resetFilters}
-                className="mt-3 text-xs font-semibold text-aira-primary underline underline-offset-2"
+                onClick={onClose}
+                aria-label="Tutup panel"
+                className="rounded-full p-2 text-aira-text/50 transition hover:bg-aira-bg hover:text-aira-primary"
               >
-                Reset pencarian dan filter
+                <X size={20} />
               </button>
-            )}
-          </section>
+            </div>
+          </div>
 
-          {/* TABEL PENGGUNA */}
-          <section className="overflow-hidden rounded-[20px] border border-aira-primary/5 bg-white shadow-[0_8px_28px_-10px_rgba(23,107,120,0.12)]">
-            <div className="flex flex-col gap-1 border-b border-aira-primary/10 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-              <div>
-                <h2 className="text-base font-semibold text-aira-primary">
-                  Daftar pengguna
-                </h2>
-                <p className="mt-1 text-xs text-aira-text/55">
-                  Informasi akun yang terdaftar pada sistem AIRA.
-                </p>
+          {/* ISI */}
+          <div className="space-y-4 overflow-y-auto p-5 sm:p-6">
+            {/* PENCARIAN DAN FILTER */}
+            <div className="space-y-3 rounded-xl bg-aira-bg p-4">
+              <form
+                onSubmit={handleSearch}
+                className="flex flex-col gap-3 sm:flex-row"
+              >
+                <div className="relative min-w-0 flex-1">
+                  <Search className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-aira-text/40" />
+                  <input
+                    type="search"
+                    value={searchInput}
+                    onChange={(event) => setSearchInput(event.target.value)}
+                    placeholder="Cari nama atau email pengguna..."
+                    className={`${adminInput} pl-10`}
+                  />
+                </div>
+
+                <button type="submit" className={adminBtnPrimary}>
+                  Cari pengguna
+                </button>
+              </form>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <select
+                  value={role}
+                  onChange={(event) => handleRoleChange(event.target.value)}
+                  aria-label="Filter peran"
+                  className={adminInput}
+                >
+                  {ROLE_OPTIONS.map((option) => (
+                    <option key={option.value || "all"} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+
+                <select
+                  value={accountStatus}
+                  onChange={(event) => handleStatusChange(event.target.value)}
+                  aria-label="Filter status akun"
+                  className={adminInput}
+                >
+                  {STATUS_FILTER_OPTIONS.map((option) => (
+                    <option key={option.value || "all"} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
               </div>
 
-              <span className="text-xs text-aira-text/55">
-                {pagination.total_data} pengguna
-              </span>
+              {(search || role || accountStatus) && (
+                <button
+                  type="button"
+                  onClick={resetFilters}
+                  className="text-xs font-semibold text-aira-primary underline underline-offset-2"
+                >
+                  Reset pencarian dan filter
+                </button>
+              )}
             </div>
 
+            {/* ERROR */}
             {error && (
-              <div className="m-5 flex items-start gap-2 rounded-xl bg-red-50 p-4 text-sm text-red-700">
+              <div
+                role="alert"
+                className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+              >
                 <AlertCircle className="mt-0.5 size-4 shrink-0" />
                 <div>
                   <p>{error}</p>
@@ -706,128 +680,146 @@ export default function UserManagement() {
               </div>
             )}
 
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[760px] border-collapse text-left">
-                <thead>
-                  <tr className="border-b border-aira-primary/10 bg-aira-bg/50 text-xs font-semibold uppercase tracking-wide text-aira-text/55">
-                    <th className="px-5 py-4">Pengguna</th>
-                    <th className="px-4 py-4">Peran</th>
-                    <th className="px-4 py-4">Status akun</th>
-                    <th className="px-4 py-4">Tanggal bergabung</th>
-                    <th className="px-5 py-4 text-right">Aksi</th>
-                  </tr>
-                </thead>
+            {/* TABEL PENGGUNA */}
+            <div className="overflow-hidden rounded-xl border border-aira-primary/10">
+              <div className="flex items-center justify-between gap-3 px-4 pt-4">
+                <p className="text-sm font-semibold text-aira-primary">
+                  Daftar pengguna
+                </p>
+                <span className="text-xs text-aira-text/55">
+                  {loading ? "..." : pagination.total_data} pengguna
+                </span>
+              </div>
 
-                <tbody>
-                  {loading ? (
-                    <tr>
-                      <td
-                        colSpan={5}
-                        className="px-5 py-12 text-center text-sm text-aira-text/55"
-                      >
-                        Memuat daftar pengguna...
-                      </td>
+              <div className="overflow-x-auto px-3 pb-2 pt-3">
+                <table className="w-full min-w-[680px] table-fixed border-collapse text-left">
+                  <colgroup>
+                    <col className="w-[32%]" />
+                    <col className="w-[14%]" />
+                    <col className="w-[18%]" />
+                    <col className="w-[22%]" />
+                    <col className="w-[14%]" />
+                  </colgroup>
+
+                  <thead>
+                    <tr className="border-b border-aira-primary/10">
+                      <th className={adminTh}>Pengguna</th>
+                      <th className={adminTh}>Peran</th>
+                      <th className={adminTh}>Status akun</th>
+                      <th className={adminTh}>Bergabung</th>
+                      <th className={`${adminTh} text-right`}>Aksi</th>
                     </tr>
-                  ) : users.length === 0 ? (
-                    <tr>
-                      <td
-                        colSpan={5}
-                        className="px-5 py-12 text-center text-sm text-aira-text/55"
-                      >
-                        Tidak ada pengguna yang sesuai dengan pencarian.
-                      </td>
-                    </tr>
-                  ) : (
-                    users.map((user) => (
-                      <tr
-                        key={user.user_id}
-                        className="border-b border-aira-primary/[0.07] transition-colors last:border-0 hover:bg-aira-bg/40"
-                      >
-                        <td className="px-5 py-4">
-                          <p className="max-w-[230px] break-words text-sm font-semibold text-aira-primary">
-                            {user.full_name || "Nama belum diisi"}
-                          </p>
-                          <p className="mt-1 max-w-[230px] break-all text-xs text-aira-text/55">
-                            {user.email}
-                          </p>
-                        </td>
+                  </thead>
 
-                        <td className="px-4 py-4">
-                          <UserRoleBadge role={user.role} />
-                        </td>
-
-                        <td className="px-4 py-4">
-                          <UserStatusBadge status={user.account_status} />
-                        </td>
-
-                        <td className="px-4 py-4 text-sm text-aira-text/65">
-                          {formatDate(user.created_at)}
-                        </td>
-
-                        <td className="px-5 py-4 text-right">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setSelectedUserId(user.user_id)
-                            }
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-aira-primary/20 px-3 py-2 text-xs font-semibold text-aira-primary transition hover:bg-aira-bg"
-                          >
-                            <Eye className="size-3.5" />
-                            Detail
-                          </button>
+                  <tbody>
+                    {loading ? (
+                      <tr>
+                        <td
+                          colSpan={5}
+                          className="py-12 text-center text-sm text-aira-text/55"
+                        >
+                          Memuat daftar pengguna...
                         </td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+                    ) : users.length === 0 ? (
+                      <tr>
+                        <td
+                          colSpan={5}
+                          className="py-12 text-center text-sm text-aira-text/55"
+                        >
+                          Tidak ada pengguna yang sesuai dengan pencarian.
+                        </td>
+                      </tr>
+                    ) : (
+                      users.map((user) => (
+                        <tr
+                          key={user.user_id}
+                          className="border-b border-aira-primary/[0.08] transition-colors last:border-b-0 hover:bg-aira-bg/60"
+                        >
+                          <td className="min-w-0 px-3 py-4 align-middle">
+                            <p className="break-words text-sm font-semibold leading-snug text-aira-primary">
+                              {user.full_name || "Nama belum diisi"}
+                            </p>
+                            <p className="mt-1 break-all text-xs leading-snug text-aira-text/55">
+                              {user.email}
+                            </p>
+                          </td>
 
-            {/* PAGINATION */}
-            <div className="flex flex-col gap-3 border-t border-aira-primary/10 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-              <p className="text-xs text-aira-text/55">
-                Halaman {pagination.current_page || 1} dari{" "}
-                {pagination.total_pages || 1}
-                {" · "}
-                Total {pagination.total_data || 0} pengguna
-              </p>
+                          <td className="px-3 py-4 align-middle">
+                            <UserRoleBadge role={user.role} />
+                          </td>
 
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setPage((current) => Math.max(1, current - 1))}
-                  disabled={
-                    loading || !pagination.has_previous_page
-                  }
-                  className="inline-flex min-h-9 items-center gap-1 rounded-lg border border-aira-primary/15 px-3 text-xs font-semibold text-aira-primary transition hover:bg-aira-bg disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  <ChevronLeft className="size-4" />
-                  Sebelumnya
-                </button>
+                          <td className="px-3 py-4 align-middle">
+                            <UserStatusBadge status={user.account_status} />
+                          </td>
 
-                <button
-                  type="button"
-                  onClick={() => setPage((current) => current + 1)}
-                  disabled={loading || !pagination.has_next_page}
-                  className="inline-flex min-h-9 items-center gap-1 rounded-lg border border-aira-primary/15 px-3 text-xs font-semibold text-aira-primary transition hover:bg-aira-bg disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  Berikutnya
-                  <ChevronRight className="size-4" />
-                </button>
+                          <td className="px-3 py-4 align-middle text-xs leading-snug text-aira-text/65">
+                            {formatDate(user.created_at)}
+                          </td>
+
+                          <td className="px-3 py-4 align-middle">
+                            <div className="flex justify-end">
+                              <button
+                                type="button"
+                                onClick={() => setSelectedUserId(user.user_id)}
+                                className={adminBtnSm}
+                              >
+                                <Eye className="size-3.5" />
+                                Detail
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* PAGINATION */}
+              <div className="flex flex-col gap-3 border-t border-aira-primary/[0.08] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-xs text-aira-text/55">
+                  Halaman {pagination.current_page || 1} dari{" "}
+                  {pagination.total_pages || 1}
+                </p>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setPage((current) => Math.max(1, current - 1))
+                    }
+                    disabled={loading || !pagination.has_previous_page}
+                    className={adminBtnSm}
+                  >
+                    <ChevronLeft className="size-4" />
+                    Sebelumnya
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setPage((current) => current + 1)}
+                    disabled={loading || !pagination.has_next_page}
+                    className={adminBtnSm}
+                  >
+                    Berikutnya
+                    <ChevronRight className="size-4" />
+                  </button>
+                </div>
               </div>
             </div>
-          </section>
-        </div>
+          </div>
+        </section>
       </div>
 
-      {/* MODAL DETAIL */}
+      {/* MODAL DETAIL (z-index lebih tinggi dari panel) */}
       {selectedUserId && (
         <UserDetailModal
           userId={selectedUserId}
           onClose={() => setSelectedUserId(null)}
-          onStatusUpdated={fetchUsers}
+          onStatusUpdated={handleStatusUpdated}
         />
       )}
-    </main>
+    </>
   );
 } 

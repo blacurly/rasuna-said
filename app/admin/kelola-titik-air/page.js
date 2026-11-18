@@ -1,4 +1,4 @@
-import AdminSidebar from "@/components/admin/AdminSidebar";
+import AdminShell from "@/components/admin/AdminShell";
 import KelolaTitikAir from "@/components/admin/titik-air/KelolaTitikAir";
 import { createClient } from "@/lib/supabase/server";
 import { ambilTitikAirTerverifikasi } from "@/services/adminTitikAirService";
@@ -41,16 +41,8 @@ export default async function KelolaTitikAirPage() {
   const titik = await ambilTitikAirTerverifikasi();
 
   return (
-    <main className="min-h-screen w-full bg-aira-bg">
-      <div className="mx-auto w-full max-w-7xl px-5 py-6">
-        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[186px_minmax(0,1fr)]">
-          <AdminSidebar admin={admin} />
-
-          <section className="w-full min-w-0">
-            <KelolaTitikAir awal={titik} />
-          </section>
-        </div>
-      </div>
-    </main>
+    <AdminShell admin={admin}>
+      <KelolaTitikAir awal={titik} />
+    </AdminShell>
   );
-}
+} 
