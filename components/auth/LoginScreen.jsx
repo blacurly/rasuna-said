@@ -5,8 +5,8 @@ import AuthCard from "@/components/auth/AuthCard";
 import ForgotPasswordForm from "@/components/auth/ForgotPasswordForm";
 import LoginForm from "@/components/auth/LoginForm";
 
-export default function LoginScreen() {
-  const [forgot, setForgot] = useState(false);
+export default function LoginScreen({ notice = null, initialForgot = false }) {
+  const [forgot, setForgot] = useState(initialForgot);
 
   return forgot ? (
     <AuthCard
@@ -20,7 +20,7 @@ export default function LoginScreen() {
       title="Selamat datang kembali"
       subtitle="Masuk untuk melihat riwayat dan memantau stok air keluarga."
     >
-      <LoginForm onForgot={() => setForgot(true)} />
+      <LoginForm onForgot={() => setForgot(true)} notice={notice} />
     </AuthCard>
   );
 }
