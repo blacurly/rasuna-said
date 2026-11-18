@@ -1,3 +1,4 @@
+
 """
 ingest.py — AIRA Document Ingestion Pipeline
 
@@ -9,7 +10,12 @@ document_registry (Supabase)
     -> Generate embedding (Gemini, 768 dimensi)
     -> Upsert chunks ke Supabase
     -> Aktifkan checksum terbaru
-    -> Bersihkan chunk versi lama
+
+PENTING:
+- Selama migrasi, chunk versi lama TIDAK dihapus.
+- Dokumen yang gagal diproses tetap mempertahankan checksum aktif sebelumnya.
+- FORCE_REPROCESS=false akan memeriksa embedding aktif dan melewati
+  dokumen yang seluruh chunk aktifnya sudah menggunakan Gemini.
 
 Environment variables:
     NEXT_PUBLIC_SUPABASE_URL      Wajib
@@ -48,6 +54,7 @@ from supabase import create_client
 
 def wajib(nama):
     """Mengambil environment variable yang wajib tersedia."""
+
     nilai = os.environ.get(nama, "").strip()
 
     if not nilai:
@@ -58,19 +65,30 @@ def wajib(nama):
     return nilai
 
 
-NEXT_PUBLIC_SUPABASE_URL = wajib("NEXT_PUBLIC_SUPABASE_URL")
-SUPABASE_SERVICE_ROLE_KEY = wajib("SUPABASE_SERVICE_ROLE_KEY")
-GEMINI_API_KEY = wajib("GEMINI_API_KEY")
+NEXT_PUBLIC_SUPABASE_URL = wajib(
+    "NEXT_PUBLIC_SUPABASE_URL"
+)
 
-if not NEXT_PUBLIC_SUPABASE_URL.startswith(("https://", "http://")):
+SUPABASE_SERVICE_ROLE_KEY = wajib(
+    "SUPABASE_SERVICE_ROLE_KEY"
+)
+
+GEMINI_API_KEY = wajib(
+    "GEMINI_API_KEY"
+)
+
+if not NEXT_PUBLIC_SUPABASE_URL.startswith(
+    ("https://", "http://")
+):
     sys.exit(
         "NEXT_PUBLIC_SUPABASE_URL harus berupa URL HTTP/HTTPS."
     )
 
 
 FORCE_REPROCESS = (
-    os.environ.get("FORCE_REPROCESS", "false").strip().lower()
-    == "true"
+    os.environ.get("FORCE_REPROCESS", "false")
+    .strip()
+    .lower() == "true"
 )
 
 _maks = os.environ.get("MAKS_DOKUMEN", "").strip()
@@ -78,13 +96,15 @@ _maks = os.environ.get("MAKS_DOKUMEN", "").strip()
 try:
     MAKS_DOKUMEN = int(_maks) if _maks else None
 except ValueError:
-    sys.exit("MAKS_DOKUMEN harus berupa bilangan bulat.")
+    sys.exit(
+        "MAKS_DOKUMEN harus berupa bilangan bulat."
+    )
 
 if MAKS_DOKUMEN is not None and MAKS_DOKUMEN < 1:
-    sys.exit("MAKS_DOKUMEN harus lebih besar dari 0.")
+    sys.exit(
+        "MAKS_DOKUMEN harus lebih besar dari 0."
+    )
 
-
-STATUS_DIPROSES = ("pending", "failed")
 
 # Model harus sama dengan model embedding pada website AIRA.
 MODEL_EMBEDDING = "gemini-embedding-001"
@@ -99,7 +119,9 @@ try:
         os.environ.get("EMBEDDING_DIMENSION", "768")
     )
 except ValueError:
-    sys.exit("EMBEDDING_DIMENSION harus berupa angka.")
+    sys.exit(
+        "EMBEDDING_DIMENSION harus berupa angka."
+    )
 
 if EMBEDDING_MODEL_NAME != MODEL_EMBEDDING:
     sys.exit(
@@ -123,16 +145,20 @@ OCR_BAHASA = "ind+eng"
 OCR_DPI = 300
 MIN_KARAKTER_TEKS = 30
 
-# Pengaturan batch dan retry
-BATCH_EMBEDDING = 50
-MAX_RETRY_EMBEDDING = 5
+# Pengaturan batch dan retry embedding.
+# Satu batch berisi maksimal 10 teks dalam satu request Gemini.
+BATCH_EMBEDDING = 10
+MAX_RETRY_EMBEDDING = 8
+JEDA_ANTAR_BATCH = 8
 
+# Pengaturan database
 BATCH_DATABASE = 50
 MAX_RETRY_DATABASE = 3
 
-# Aktifkan pembersihan chunk versi lama.
-# Pembersihan dilakukan SETELAH checksum baru berhasil diaktifkan.
-HAPUS_CHUNK_VERSI_LAMA = True
+# Pengamanan migrasi:
+# Jangan menghapus chunk versi lama.
+# Jangan ubah menjadi True selama migrasi dan pengujian.
+HAPUS_CHUNK_VERSI_LAMA = False
 
 
 # =========================================================
@@ -151,7 +177,9 @@ try:
         SUPABASE_SERVICE_ROLE_KEY
     )
 except Exception as e:
-    sys.exit(f"Gagal membuat koneksi Supabase: {e}")
+    sys.exit(
+        f"Gagal membuat koneksi Supabase: {e}"
+    )
 
 
 print(
@@ -163,7 +191,9 @@ try:
         api_key=GEMINI_API_KEY
     )
 except Exception as e:
-    sys.exit(f"Gagal membuat client Gemini: {e}")
+    sys.exit(
+        f"Gagal membuat client Gemini: {e}"
+    )
 
 
 def normalisasi(vector):
@@ -171,20 +201,35 @@ def normalisasi(vector):
     Normalisasi L2 untuk embedding 768 dimensi.
     """
 
-    nilai_vector = [float(nilai) for nilai in vector]
+    nilai_vector = [
+        float(nilai)
+        for nilai in vector
+    ]
 
     if not nilai_vector:
-        raise ValueError("Embedding kosong.")
+        raise ValueError(
+            "Embedding kosong."
+        )
 
-    if not all(math.isfinite(nilai) for nilai in nilai_vector):
-        raise ValueError("Embedding mengandung nilai tidak valid.")
+    if not all(
+        math.isfinite(nilai)
+        for nilai in nilai_vector
+    ):
+        raise ValueError(
+            "Embedding mengandung nilai tidak valid."
+        )
 
     norma = math.sqrt(
-        sum(nilai * nilai for nilai in nilai_vector)
+        sum(
+            nilai * nilai
+            for nilai in nilai_vector
+        )
     )
 
     if not math.isfinite(norma) or norma == 0:
-        raise ValueError("Embedding tidak dapat dinormalisasi.")
+        raise ValueError(
+            "Embedding tidak dapat dinormalisasi."
+        )
 
     return [
         nilai / norma
@@ -192,15 +237,91 @@ def normalisasi(vector):
     ]
 
 
+def ambil_jeda_retry(error, percobaan):
+    """
+    Mengambil waktu tunggu dari pesan error Gemini.
+
+    Jika Google memberikan retryDelay, gunakan nilai tersebut.
+    Jika tidak, gunakan exponential backoff.
+    """
+
+    pesan = str(error)
+
+    pola_retry_delay = re.search(
+        r"retryDelay['\"]?\s*:\s*['\"](\d+(?:\.\d+)?)s",
+        pesan,
+        re.IGNORECASE
+    )
+
+    pola_retry_text = re.search(
+        r"Please retry in\s+(\d+(?:\.\d+)?)s",
+        pesan,
+        re.IGNORECASE
+    )
+
+    match = pola_retry_delay or pola_retry_text
+
+    if match:
+        return float(match.group(1)) + 3
+
+    # Fallback: 15, 30, 60, 120, dan seterusnya.
+    return min(
+        15 * (2 ** percobaan),
+        120
+    )
+
+
+def error_bisa_dicoba_ulang(error):
+    """
+    Mengidentifikasi error sementara yang layak di-retry.
+
+    Retry untuk:
+    - HTTP 429 / RESOURCE_EXHAUSTED
+    - HTTP 5xx
+    - Timeout dan gangguan koneksi sementara
+
+    Error validasi atau konfigurasi tidak di-retry.
+    """
+
+    pesan = str(error).lower()
+
+    penanda_sementara = (
+        "429",
+        "resource_exhausted",
+        "resource exhausted",
+        "rate limit",
+        "quota exceeded",
+        "quota_failure",
+        "500",
+        "502",
+        "503",
+        "504",
+        "internal server error",
+        "service unavailable",
+        "deadline exceeded",
+        "timed out",
+        "timeout",
+        "connection reset",
+        "connection aborted",
+        "temporarily unavailable",
+        "temporary failure",
+    )
+
+    return any(
+        penanda in pesan
+        for penanda in penanda_sementara
+    )
+
+
 def embed_batch(teks_list):
     """
     Membuat embedding Gemini untuk satu batch teks.
 
-    Task type:
-        RETRIEVAL_DOCUMENT
-
     Model:
         gemini-embedding-001
+
+    Task type:
+        RETRIEVAL_DOCUMENT
 
     Dimensi:
         768
@@ -247,33 +368,60 @@ def embed_batch(teks_list):
 
         except Exception as e:
 
-            if percobaan == MAX_RETRY_EMBEDDING - 1:
+            # Error permanen tidak perlu dicoba berulang kali.
+            if not error_bisa_dicoba_ulang(e):
+                print(
+                    "Error embedding bukan error sementara. "
+                    "Retry dihentikan."
+                )
                 raise
 
-            jeda = 5 * (percobaan + 1)
+            # Semua kesempatan retry sudah habis.
+            if percobaan == MAX_RETRY_EMBEDDING - 1:
+                print(
+                    "Batas percobaan retry embedding telah habis."
+                )
+                raise
+
+            jeda = ambil_jeda_retry(
+                e,
+                percobaan
+            )
 
             print(
-                f"Embedding gagal: {str(e)[:150]}. "
-                f"Mencoba lagi dalam {jeda} detik..."
+                f"Embedding gagal pada percobaan "
+                f"{percobaan + 1}/{MAX_RETRY_EMBEDDING}: "
+                f"{str(e)[:250]}"
+            )
+
+            print(
+                f"Menunggu {jeda:.1f} detik sebelum mencoba kembali..."
             )
 
             time.sleep(jeda)
 
 
 # Tes koneksi Gemini sebelum ingestion dimulai.
+# Tes ini menggunakan satu request embedding.
 try:
     embedding_tes = embed_batch([
         "Tes koneksi embedding AIRA."
     ])
 
     if len(embedding_tes) != 1:
-        raise ValueError("Hasil tes embedding tidak valid.")
+        raise ValueError(
+            "Hasil tes embedding tidak valid."
+        )
 
     if len(embedding_tes[0]) != EMBEDDING_DIM:
-        raise ValueError("Dimensi embedding tes tidak sesuai.")
+        raise ValueError(
+            "Dimensi embedding tes tidak sesuai."
+        )
 
 except Exception as e:
-    sys.exit(f"Gagal memanggil Gemini embedding: {e}")
+    sys.exit(
+        f"Gagal memanggil Gemini embedding: {e}"
+    )
 
 
 print(
@@ -314,7 +462,9 @@ def siapkan_ocr():
         )
         return False
 
-    print("Tesseract OCR siap: Indonesia + Inggris.")
+    print(
+        "Tesseract OCR siap: Indonesia + Inggris."
+    )
 
     return True
 
@@ -329,7 +479,9 @@ OCR_SIAP = siapkan_ocr()
 def muat_registry():
     """Mengambil seluruh dokumen dari document_registry."""
 
-    print("Mengambil document registry dari Supabase...")
+    print(
+        "Mengambil document registry dari Supabase..."
+    )
 
     response = (
         supabase
@@ -340,6 +492,59 @@ def muat_registry():
     )
 
     return response.data or []
+
+
+def dokumen_sudah_gemini(doc):
+    """
+    Memeriksa apakah seluruh chunk pada versi aktif dokumen
+    sudah menggunakan Gemini embedding.
+
+    Fungsi ini hanya membaca Supabase.
+    Tidak melakukan UPDATE atau DELETE.
+    """
+
+    document_id = doc.get("document_id")
+
+    checksum = (
+        doc.get("last_successful_checksum")
+        or doc.get("checksum_sha256")
+    )
+
+    if not document_id or not checksum:
+        return False
+
+    response = (
+        supabase
+        .table("document_chunks")
+        .select(
+            "embedding_model,embedding,chunk_index"
+        )
+        .eq("document_id", document_id)
+        .eq("checksum_sha256", checksum)
+        .execute()
+    )
+
+    rows = response.data or []
+
+    if not rows:
+        return False
+
+    # Setiap chunk aktif harus:
+    # 1. Menggunakan model Gemini yang ditentukan.
+    # 2. Memiliki embedding.
+    # 3. Memiliki indeks chunk.
+    for row in rows:
+
+        if row.get("embedding_model") != EMBEDDING_MODEL_NAME:
+            return False
+
+        if row.get("embedding") is None:
+            return False
+
+        if row.get("chunk_index") is None:
+            return False
+
+    return True
 
 
 # =========================================================
@@ -359,8 +564,14 @@ def dapatkan_drive_id(doc):
     url = doc.get("drive_url") or ""
 
     match = (
-        re.search(r"/d/([A-Za-z0-9_-]+)", url)
-        or re.search(r"[?&]id=([A-Za-z0-9_-]+)", url)
+        re.search(
+            r"/d/([A-Za-z0-9_-]+)",
+            url
+        )
+        or re.search(
+            r"[?&]id=([A-Za-z0-9_-]+)",
+            url
+        )
     )
 
     return match.group(1) if match else None
@@ -450,7 +661,9 @@ def extract_pdf_pages(pdf_path, doc):
     raw_pages = []
     jumlah_ocr = 0
 
-    waktu = datetime.now(timezone.utc).isoformat()
+    waktu = datetime.now(
+        timezone.utc
+    ).isoformat()
 
     with pymupdf.open(pdf_path) as pdf:
 
@@ -591,15 +804,23 @@ def generate_embeddings(chunks):
 
     embeddings = []
 
-    for start in range(0, len(contents), BATCH_EMBEDDING):
+    for start in range(
+        0,
+        len(contents),
+        BATCH_EMBEDDING
+    ):
 
         batch_teks = contents[
             start:start + BATCH_EMBEDDING
         ]
 
-        batch_embeddings = embed_batch(batch_teks)
+        batch_embeddings = embed_batch(
+            batch_teks
+        )
 
-        embeddings.extend(batch_embeddings)
+        embeddings.extend(
+            batch_embeddings
+        )
 
         selesai = min(
             start + BATCH_EMBEDDING,
@@ -610,7 +831,12 @@ def generate_embeddings(chunks):
             f"Embedding: {selesai}/{len(contents)}"
         )
 
-        time.sleep(1)
+        # Tidak perlu menunggu setelah batch terakhir.
+        if selesai < len(contents):
+            print(
+                f"Jeda antarb​​atch: {JEDA_ANTAR_BATCH} detik."
+            )
+            time.sleep(JEDA_ANTAR_BATCH)
 
     if len(embeddings) != len(chunks):
         raise ValueError(
@@ -686,7 +912,7 @@ def _simpan_batch(
             waktu_tunggu = 2 * (i + 1)
 
             print(
-                f"Gagal menyimpan batch: {str(e)[:150]}. "
+                f"Gagal menyimpan batch: {str(e)[:200]}. "
                 f"Mencoba ulang dalam {waktu_tunggu} detik..."
             )
 
@@ -698,7 +924,7 @@ def save_chunks(doc, chunks, embeddings, checksum):
     Menyimpan chunk dan embedding baru.
 
     embedding_model dicatat pada setiap baris.
-    Upsert akan memperbarui embedding lama jika
+    Upsert memperbarui baris jika kombinasi
     document_id, checksum, dan chunk_index sama.
     """
 
@@ -735,7 +961,11 @@ def save_chunks(doc, chunks, embeddings, checksum):
 
     total = len(rows)
 
-    for start in range(0, total, BATCH_DATABASE):
+    for start in range(
+        0,
+        total,
+        BATCH_DATABASE
+    ):
 
         batch = rows[
             start:start + BATCH_DATABASE
@@ -767,7 +997,9 @@ def update_status(
 ):
     """Memperbarui status dokumen di registry."""
 
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(
+        timezone.utc
+    ).isoformat()
 
     data = {
         "processing_status": status,
@@ -808,7 +1040,9 @@ def update_status_gagal(doc, error):
 
     document_id = doc["document_id"]
 
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(
+        timezone.utc
+    ).isoformat()
 
     sebelumnya_sudah_berhasil = (
         doc.get("processing_status") == "completed"
@@ -844,54 +1078,29 @@ def update_status_gagal(doc, error):
 
 
 # =========================================================
-# 12. MEMBERSIHKAN CHUNK VERSI LAMA
+# 12. PEMBERSIHAN CHUNK VERSI LAMA
 # =========================================================
 
 def hapus_chunk_lama(doc, checksum, jumlah_chunk_baru):
     """
-    Menghapus chunk versi lama setelah checksum terbaru
-    berhasil diaktifkan di document_registry.
+    Fungsi pembersihan dipertahankan untuk kebutuhan
+    pemeliharaan mendatang.
 
-    Chunk dengan checksum berbeda akan dihapus.
-    Chunk sisa dengan indeks melebihi jumlah chunk baru
-    juga akan dihapus.
+    Selama migrasi ini, HAPUS_CHUNK_VERSI_LAMA=False.
+    Karena itu, fungsi langsung berhenti tanpa DELETE.
     """
 
     if not HAPUS_CHUNK_VERSI_LAMA:
+        print(
+            "Pembersihan chunk dinonaktifkan. "
+            "Seluruh chunk lama tetap dipertahankan."
+        )
         return
 
-    document_id = doc["document_id"]
-
-    print(
-        "Membersihkan chunk versi lama..."
-    )
-
-    # Hapus chunk dari checksum dokumen sebelumnya.
-    (
-        supabase
-        .table("document_chunks")
-        .delete()
-        .eq("document_id", document_id)
-        .neq("checksum_sha256", checksum)
-        .execute()
-    )
-
-    # Hapus indeks sisa jika jumlah chunk versi baru
-    # lebih sedikit daripada versi sebelumnya.
-    indeks_maksimum = jumlah_chunk_baru - 1
-
-    (
-        supabase
-        .table("document_chunks")
-        .delete()
-        .eq("document_id", document_id)
-        .eq("checksum_sha256", checksum)
-        .gt("chunk_index", indeks_maksimum)
-        .execute()
-    )
-
-    print(
-        "Pembersihan chunk versi lama selesai."
+    # Pengamanan tambahan.
+    # Jangan aktifkan penghapusan selama migrasi.
+    raise RuntimeError(
+        "Penghapusan chunk dinonaktifkan selama migrasi AIRA."
     )
 
 
@@ -925,8 +1134,10 @@ def process_document(doc):
         # 1. Download PDF
         pdf_path = download_from_drive(doc)
 
-        # 2. Hitung checksum
-        checksum = calculate_file_checksum(pdf_path)
+        # 2. Hitung checksum file
+        checksum = calculate_file_checksum(
+            pdf_path
+        )
 
         print(
             f"Checksum dokumen: {checksum}"
@@ -945,15 +1156,20 @@ def process_document(doc):
             )
 
         # 4. Chunking
-        chunks = create_chunks(raw_pages)
+        chunks = create_chunks(
+            raw_pages
+        )
 
         if not chunks:
             raise ValueError(
                 "Tidak ada chunk yang berhasil dibuat."
             )
 
-        # 5. Embedding Gemini
-        embeddings = generate_embeddings(chunks)
+        # 5. Buat seluruh embedding terlebih dahulu.
+        # Jika Gemini gagal, belum ada chunk baru yang disimpan.
+        embeddings = generate_embeddings(
+            chunks
+        )
 
         if not embeddings:
             raise ValueError(
@@ -966,6 +1182,7 @@ def process_document(doc):
             )
 
         # 6. Simpan seluruh chunk baru.
+        # Jika penyimpanan gagal, checksum aktif belum diubah.
         jumlah = save_chunks(
             doc,
             chunks,
@@ -978,29 +1195,24 @@ def process_document(doc):
                 "Jumlah chunk yang disimpan tidak sesuai."
             )
 
-        # 7. Aktifkan checksum baru.
-        # RPC akan mulai menggunakan chunk dengan checksum ini.
+        # 7. Aktifkan checksum baru setelah seluruh chunk tersimpan.
+        # RPC menggunakan checksum aktif dari document_registry.
         update_status(
             document_id=document_id,
             checksum=checksum,
             status="completed"
         )
 
-        # 8. Bersihkan versi lama setelah versi baru aktif.
-        # Kegagalan pembersihan tidak membatalkan ingestion.
-        try:
-            hapus_chunk_lama(
-                doc,
-                checksum,
-                jumlah
-            )
+        print(
+            "Checksum terbaru berhasil diaktifkan."
+        )
 
-        except Exception as cleanup_error:
-            print(
-                "PERINGATAN: Chunk baru sudah aktif, "
-                "tetapi pembersihan chunk lama gagal: "
-                f"{cleanup_error}"
-            )
+        # 8. Tidak menghapus chunk lama selama migrasi.
+        hapus_chunk_lama(
+            doc,
+            checksum,
+            jumlah
+        )
 
         print(
             f"Selesai: {len(raw_pages)} halaman, "
@@ -1065,22 +1277,52 @@ def main():
         )
         return
 
-    # FORCE_REPROCESS=true:
-    # Semua dokumen diproses ulang, termasuk completed.
-    #
-    # FORCE_REPROCESS=false:
-    # Hanya dokumen pending dan failed yang diproses.
-    if FORCE_REPROCESS:
+    print(
+        "\nMemeriksa status embedding setiap dokumen..."
+    )
 
-        antrean = docs
+    antrean = []
 
-    else:
+    jumlah_dilewati = 0
 
-        antrean = [
+    for doc in docs:
+
+        title = (
+            doc.get("title")
+            or doc.get("document_id")
+        )
+
+        if FORCE_REPROCESS:
+
+            print(
+                f"[FORCE] {title} - akan diproses ulang."
+            )
+
+            antrean.append(doc)
+            continue
+
+        # Periksa versi aktif di Supabase.
+        # Jika pemeriksaan gagal, proses dihentikan agar
+        # dokumen tidak salah dianggap sudah selesai.
+        sudah_gemini = dokumen_sudah_gemini(
             doc
-            for doc in docs
-            if doc.get("processing_status") in STATUS_DIPROSES
-        ]
+        )
+
+        if sudah_gemini:
+
+            print(
+                f"[SKIP] {title} - embedding Gemini sudah lengkap."
+            )
+
+            jumlah_dilewati += 1
+
+        else:
+
+            print(
+                f"[PROSES] {title} - embedding Gemini belum lengkap."
+            )
+
+            antrean.append(doc)
 
     if MAKS_DOKUMEN is not None:
         antrean = antrean[:MAKS_DOKUMEN]
@@ -1090,6 +1332,10 @@ def main():
 
     print(
         f"Total registry       : {len(docs)}"
+    )
+
+    print(
+        f"Dokumen sudah Gemini : {jumlah_dilewati}"
     )
 
     print(
@@ -1117,7 +1363,19 @@ def main():
     )
 
     print(
-        f"Task type            : RETRIEVAL_DOCUMENT"
+        "Task type            : RETRIEVAL_DOCUMENT"
+    )
+
+    print(
+        f"Batch embedding      : {BATCH_EMBEDDING}"
+    )
+
+    print(
+        f"Jeda antarb​​atch     : {JEDA_ANTAR_BATCH} detik"
+    )
+
+    print(
+        f"Hapus chunk lama     : {HAPUS_CHUNK_VERSI_LAMA}"
     )
 
     print("-" * 45)
@@ -1125,13 +1383,16 @@ def main():
     if not antrean:
 
         print(
-            "Tidak ada dokumen pending atau failed."
+            "Tidak ada dokumen yang perlu diproses."
         )
         return
 
     ringkasan = Counter()
 
-    for index, doc in enumerate(antrean, start=1):
+    for index, doc in enumerate(
+        antrean,
+        start=1
+    ):
 
         print(
             f"\nPROGRES DOKUMEN {index}/{len(antrean)}"
@@ -1146,15 +1407,23 @@ def main():
     print("=" * 65)
 
     print(
-        f"Berhasil : {ringkasan.get('completed', 0)}"
+        f"Berhasil dilewati : {jumlah_dilewati}"
     )
 
     print(
-        f"Gagal    : {ringkasan.get('failed', 0)}"
+        f"Berhasil diproses : {ringkasan.get('completed', 0)}"
     )
 
     print(
-        f"Model    : {EMBEDDING_MODEL_NAME}"
+        f"Gagal             : {ringkasan.get('failed', 0)}"
+    )
+
+    print(
+        f"Model             : {EMBEDDING_MODEL_NAME}"
+    )
+
+    print(
+        f"Penghapusan chunk : {HAPUS_CHUNK_VERSI_LAMA}"
     )
 
     if ringkasan.get("failed", 0) > 0:
