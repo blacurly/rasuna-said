@@ -14,6 +14,7 @@ export default function AssistantClient() {
     input,
     setInput,
     loading,
+    historyLoading,
     error,
     endRef,
     sendMessage,
@@ -38,6 +39,7 @@ export default function AssistantClient() {
         <ChatPanel
           messages={messages}
           loading={loading}
+           historyLoading={historyLoading}
           error={error}
           onSelectPrompt={sendMessage}
           onRetry={retryMessageSend}
