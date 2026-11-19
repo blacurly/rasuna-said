@@ -10,10 +10,10 @@ import { Button } from "@/components/ui/button";
 import { login } from "@/app/actions/auth";
 import { validateEmail, validatePassword } from "@/lib/validation";
 
-export default function LoginForm({ onForgot }) {
+export default function LoginForm({ onForgot, notice = null }) {
   const [isPending, startTransition] = useTransition();
   const [errors, setErrors] = useState({});
-  const [feedback, setFeedback] = useState(null);
+  const [feedback, setFeedback] = useState(notice);
 
   // Hapus pesan error kolom yang sedang diubah pengguna.
   const clear = (field) => () => {

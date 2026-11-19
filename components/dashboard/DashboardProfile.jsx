@@ -7,9 +7,9 @@ export default function DashboardProfile({ nama, inisial, anggotaKeluarga }) {
 
       <div className="min-w-0">
         <p className="truncate font-semibold">{nama || "Pengguna AIRA"}</p>
-        <p className="text-xs text-aira-text/60">
-          {anggotaKeluarga ? `Keluarga ${anggotaKeluarga} orang` : "Profil keluarga belum diisi"}
-        </p>
+        {anggotaKeluarga ? (
+          <p className="text-xs text-aira-text/60">Keluarga {anggotaKeluarga} orang</p>
+        ) : null}
       </div>
     </div>
   );

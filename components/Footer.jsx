@@ -18,6 +18,7 @@ const footerGroups = [
         label: "AIRA Assistant",
         href: "/assistant",
       },
+      { label: "Tentang Kami", href: "/#tentang-kami" },
     ],
   },
   {
@@ -125,7 +126,7 @@ export default function Footer({ waveFill = "#F9FBFB", admin = false }) {
               key={group.title}
               className="min-w-0"
             >
-              <h4 className="mb-4 text-base font-semibold">
+              <h4 className="mb-4 text-base font-semibold tracking-normal text-white">
                 {group.title}
               </h4>
 

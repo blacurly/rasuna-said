@@ -2,6 +2,7 @@ import HeroSection from "@/components/home/HeroSection";
 import HeroWave from "@/components/home/HeroWave";
 import FeatureSection from "@/components/home/FeatureSection";
 import ValueSection from "@/components/home/ValueSection";
+import AboutSection from "@/components/home/AboutSection";
 
 export default function HomePage() {
   return (
@@ -10,6 +11,7 @@ export default function HomePage() {
       <HeroWave />
       <FeatureSection />
       <ValueSection />
+      <AboutSection />
     </>
   );
 } 

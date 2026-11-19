@@ -1,353 +1,188 @@
 "use client";
 
-import { useEffect } from "react";
-import { X, Send } from "lucide-react";
+import { useEffect, useState } from "react";
+import { MessageSquareWarning, Send, X } from "lucide-react";
 
-const initialForm = {
-  name: "",
-  type: "Sumur bor",
-  address: "",
-  mapsUrl: "",
-  availability: "Tersedia",
-  accessHours: "",
-  manager: "",
-  managerContact: "",
-  informationSource: "",
-  note: "",
-};
+import { Field, inputCls } from "@/components/dashboard/DashboardFormUi";
+import { JENIS_FORM, SUMBER_INFO_FORM } from "@/lib/kontribusiUser";
 
-function getFormValues(editData) {
-  if (!editData) {
-    return initialForm;
-  }
+// Modal "Kirim Titik Air Baru" / "Perbaiki Titik Air" sesuai Figma Make.
+// `editData` berisi item kontribusi (status Perlu Perbaikan) beserta `extra` untuk prefill.
+export default function ContributionForm({ editData, onClose, onSubmit }) {
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
 
-  return {
-    name: editData.name || "",
-    type: editData.type || "Sumur bor",
-    address: editData.address || "",
-    mapsUrl: editData.mapsUrl || "",
-    availability: editData.availability || "Tersedia",
-    accessHours: editData.accessHours || "",
-    manager: editData.manager || "",
-    managerContact: editData.managerContact || "",
-    informationSource: editData.informationSource || "",
-    note: editData.note || "",
-  };
-}
+  const prefill = editData?.extra;
+  const typeOptions = editData && !JENIS_FORM.includes(editData.type) ? [editData.type, ...JENIS_FORM] : JENIS_FORM;
+  const ketersediaan = [
+    ["Tersedia", "Tersedia"],
+    ["Terbatas", "Terbatas"],
+    ["Tidak Tersedia", "Tidak tersedia"],
+    ...(prefill?.availability === "Belum Diketahui" ? [["Belum Diketahui", "Belum diketahui"]] : []),
+  ];
 
-export default function ContributionForm({
-  isOpen,
-  onClose,
-  onSubmit,
-  editData,
-}) {
   useEffect(() => {
-    if (!isOpen) return;
-
-    function handleEscape(event) {
-      if (event.key === "Escape") {
-        onClose();
-      }
-    }
-
-    document.addEventListener("keydown", handleEscape);
+    const onKey = (e) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-
     return () => {
-      document.removeEventListener("keydown", handleEscape);
-      document.body.style.overflow = "";
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
     };
-  }, [isOpen, onClose]);
+  }, [onClose]);
 
-  if (!isOpen) return null;
-
-  const formValues = getFormValues(editData);
-
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
+    const f = new FormData(event.currentTarget);
+    const val = (k) => String(f.get(k) ?? "").trim();
 
-    const formData = new FormData(event.currentTarget);
-
-    const form = {
-      name: String(formData.get("name") || "").trim(),
-      type: String(formData.get("type") || "Sumur bor"),
-      address: String(formData.get("address") || "").trim(),
-      mapsUrl: String(formData.get("mapsUrl") || "").trim(),
-      availability: String(
-        formData.get("availability") || "Tersedia"
-      ),
-      accessHours: String(formData.get("accessHours") || "").trim(),
-      manager: String(formData.get("manager") || "").trim(),
-      managerContact: String(
-        formData.get("managerContact") || ""
-      ).trim(),
-      informationSource: String(
-        formData.get("informationSource") || ""
-      ),
-      note: String(formData.get("note") || "").trim(),
-    };
-
-    onSubmit(form);
+    setError("");
+    setSaving(true);
+    const hasil = await onSubmit({
+      name: val("name"),
+      type: val("type"),
+      address: val("address"),
+      maps: val("maps"),
+      avail: val("avail"),
+      hours: val("hours"),
+      owner: val("owner"),
+      phone: val("phone"),
+      infoSource: val("infoSource"),
+      note: val("note"),
+    });
+    if (hasil && hasil.success === false) {
+      setError(hasil.message || "Kontribusi gagal dikirim.");
+      setSaving(false);
+    }
   }
-
-  const inputClass =
-    "w-full rounded-xl border border-[#C9DDE3] bg-white px-3 py-3 text-xs text-[#34464B] outline-none transition placeholder:text-gray-400 focus:border-[#4EA8DE] focus:ring-2 focus:ring-[#4EA8DE]/20";
-
-  const labelClass = "mb-2 block text-xs font-medium text-[#34464B]";
 
   return (
     <div
-      className="fixed inset-0 z-100 flex items-center justify-center bg-[#164F58]/60 p-3 backdrop-blur-[2px] sm:p-5"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) {
-          onClose();
-        }
+      className="fixed inset-0 z-100 flex items-end justify-center bg-aira-primary-dark/60 p-0 backdrop-blur-sm sm:items-center sm:p-6"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div
+      <form
         role="dialog"
         aria-modal="true"
-        aria-labelledby="contribution-form-title"
-        className="flex max-h-[92vh] w-full max-w-127.5 flex-col overflow-hidden rounded-3xl bg-white shadow-2xl"
+        aria-labelledby="contrib-title"
+        onSubmit={handleSubmit}
+        className="fade-up flex max-h-[calc(100dvh-0.5rem)] w-full max-w-2xl flex-col rounded-t-[28px] bg-white shadow-soft sm:max-h-[92vh] sm:rounded-[28px]"
       >
-        {/* Header modal */}
-        <div className="flex shrink-0 items-start justify-between border-b border-gray-100 px-5 py-4 sm:px-6">
+        <div className="flex items-start justify-between gap-4 border-b border-aira-primary/10 px-4 py-5 sm:px-8">
           <div>
-            <h2
-              id="contribution-form-title"
-              className="text-base font-semibold text-aira-primary"
-            >
+            <h2 id="contrib-title" className="text-xl font-semibold text-aira-primary">
               {editData ? "Perbaiki Titik Air" : "Kirim Titik Air Baru"}
             </h2>
-
-            <p className="mt-1 max-w-97.5 text-[11px] leading-relaxed text-gray-400">
-              Lengkapi informasi yang Anda ketahui. Admin akan memverifikasi
-              sebelum data ditampilkan.
+            <p className="mt-1 text-sm leading-normal text-aira-text/65">
+              {editData
+                ? "Perbarui data sesuai catatan admin, lalu kirim ulang untuk diverifikasi."
+                : "Lengkapi informasi yang Anda ketahui. Admin akan memverifikasi sebelum data ditampilkan."}
             </p>
           </div>
-
           <button
             type="button"
             onClick={onClose}
-            aria-label="Tutup formulir"
-            className="ml-3 rounded-lg p-1 text-gray-500 transition hover:bg-gray-100"
+            aria-label="Tutup"
+            className="grid size-10 shrink-0 place-items-center rounded-full text-aira-text/70 transition-colors hover:bg-aira-primary/10"
           >
-            <X size={19} />
+            <X className="size-5" />
           </button>
         </div>
 
-        {/* Form scroll area */}
-        <form
-          key={JSON.stringify(editData || null)}
-          onSubmit={handleSubmit}
-          className="flex min-h-0 flex-1 flex-col"
-        >
-          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-5 py-5 sm:px-6">
-            {/* Nama dan jenis sumber */}
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div>
-                <label className={labelClass} htmlFor="contribution-name">
-                  Nama titik air
-                </label>
-                <input
-                  id="contribution-name"
-                  required
-                  name="name"
-                  defaultValue={formValues.name}
-                  placeholder="Contoh: Sumur Komunal RT 04"
-                  className={inputClass}
-                />
-              </div>
+        <div className="space-y-5 overflow-y-auto overscroll-contain px-4 py-6 sm:px-8">
+          {editData?.adminNote && (
+            <p className="flex gap-2 rounded-xl bg-aira-sand p-3 text-sm leading-normal">
+              <MessageSquareWarning className="mt-0.5 size-4 shrink-0 text-aira-coral-dark" />
+              <span>
+                <b>Catatan admin:</b> {editData.adminNote}
+              </span>
+            </p>
+          )}
 
-              <div>
-                <label className={labelClass} htmlFor="contribution-type">
-                  Jenis sumber
-                </label>
-                <select
-                  id="contribution-type"
-                  name="type"
-                  defaultValue={formValues.type}
-                  className={inputClass}
-                >
-                  <option>Sumur bor</option>
-                  <option>Sumur gali</option>
-                  <option>Mata air</option>
-                  <option>Embung</option>
-                  <option>Waduk</option>
-                  <option>Sungai</option>
-                  <option>Tangki air</option>
-                  <option>PDAM</option>
-                  <option>Lainnya</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Alamat */}
-            <div>
-              <label className={labelClass} htmlFor="contribution-address">
-                Alamat lengkap
-              </label>
-              <textarea
-                id="contribution-address"
-                required
-                name="address"
-                defaultValue={formValues.address}
-                rows={2}
-                placeholder="Jalan, RT/RW, desa, kecamatan"
-                className={`${inputClass} resize-y`}
-              />
-            </div>
-
-            {/* Google Maps */}
-            {/* Google Maps */}
-            <div>
-              <label className={labelClass} htmlFor="contribution-maps">
-                Tautan Google Maps
-              </label>
-              <input
-                id="contribution-maps"
-                name="mapsUrl"
-                type="url"
-                defaultValue={formValues.mapsUrl}
-                placeholder="https://maps.app.goo.gl/..."
-                className={inputClass}
-              />
-              <p className="mt-1 text-[10px] text-gray-400">
-                Buka lokasi di Google Maps, pilih Bagikan, lalu tempel tautannya.
-              </p>
-            </div>
-
-            {/* Ketersediaan dan jam akses */}
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div>
-                <label
-                  className={labelClass}
-                  htmlFor="contribution-availability"
-                >
-                  Ketersediaan air saat ini
-                </label>
-                <select
-                  id="contribution-availability"
-                  name="availability"
-                  defaultValue={formValues.availability}
-                  className={inputClass}
-                >
-                  <option>Tersedia</option>
-                  <option>Terbatas</option>
-                  <option>Tidak tersedia</option>
-                  <option>Belum diketahui</option>
-                </select>
-              </div>
-
-              <div>
-                <label
-                  className={labelClass}
-                  htmlFor="contribution-access-hours"
-                >
-                  Jam akses
-                </label>
-                <input
-                  id="contribution-access-hours"
-                  name="accessHours"
-                  defaultValue={formValues.accessHours}
-                  placeholder="Contoh: 06.00 - 18.00"
-                  className={inputClass}
-                />
-              </div>
-            </div>
-
-            {/* Pengelola */}
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div>
-                <label
-                  className={labelClass}
-                  htmlFor="contribution-manager"
-                >
-                  Nama pengelola
-                </label>
-                <input
-                  id="contribution-manager"
-                  name="manager"
-                  defaultValue={formValues.manager}
-                  className={inputClass}
-                />
-              </div>
-
-              <div>
-                <label
-                  className={labelClass}
-                  htmlFor="contribution-manager-contact"
-                >
-                  Kontak pengelola
-                </label>
-                <input
-                  id="contribution-manager-contact"
-                  name="managerContact"
-                  defaultValue={formValues.managerContact}
-                  className={inputClass}
-                />
-              </div>
-            </div>
-
-            {/* Sumber informasi */}
-            <div>
-              <label
-                className={labelClass}
-                htmlFor="contribution-information-source"
-              >
-                Sumber informasi (opsional)
-              </label>
-              <select
-                id="contribution-information-source"
-                name="informationSource"
-                defaultValue={formValues.informationSource}
-                className={inputClass}
-              >
-                <option value="">Pilih sumber informasi</option>
-                <option>Pengamatan langsung</option>
-                <option>Pengelola sumber air</option>
-                <option>Masyarakat sekitar</option>
-                <option>Pemerintah desa</option>
-                <option>Sumber lainnya</option>
+          <div className="grid gap-5 sm:grid-cols-2">
+            <Field label="Nama titik air">
+              <input name="name" required autoFocus defaultValue={editData?.name} placeholder="Contoh: Sumur Komunal RT 04" className={inputCls} />
+            </Field>
+            <Field label="Jenis sumber">
+              <select name="type" defaultValue={editData?.type} className={inputCls}>
+                {typeOptions.map((t) => (
+                  <option key={t}>{t}</option>
+                ))}
               </select>
-            </div>
-
-            {/* Catatan tambahan */}
-            <div>
-              <label className={labelClass} htmlFor="contribution-note">
-                Catatan tambahan
-              </label>
-              <textarea
-                id="contribution-note"
-                name="note"
-                defaultValue={formValues.note}
-                rows={3}
-                placeholder="Biaya, antrean, aturan penggunaan"
-                className={`${inputClass} resize-y`}
-              />
-            </div>
+            </Field>
           </div>
 
-          {/* Footer tetap di bawah */}
-          <div className="flex shrink-0 items-center justify-end gap-3 border-t border-gray-100 bg-white px-5 py-3 sm:px-6">
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-full px-4 py-2.5 text-xs font-medium text-aira-primary transition hover:bg-[#EAF5F4]"
-            >
-              Batal
-            </button>
+          <Field label="Alamat lengkap">
+            <textarea name="address" required rows={2} defaultValue={editData?.address === "-" ? "" : editData?.address} placeholder="Jalan, RT/RW, desa, kecamatan" className={inputCls} />
+          </Field>
 
-            <button
-              type="submit"
-              className="inline-flex items-center gap-2 rounded-full bg-aira-primary px-5 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-[#125762]"
-            >
-              <Send size={14} />
-              {editData ? "Kirim Ulang" : "Kirim untuk Verifikasi"}
-            </button>
+          <Field label="Tautan Google Maps" hint="Buka lokasi di Google Maps, pilih Bagikan, lalu tempel tautannya">
+            <input name="maps" type="url" defaultValue={prefill?.maps} placeholder="https://maps.app.goo.gl/..." className={inputCls} />
+          </Field>
+
+          <div className="grid gap-5 sm:grid-cols-2">
+            <Field label="Ketersediaan air saat ini">
+              <select name="avail" defaultValue={prefill?.availability} className={inputCls}>
+                {ketersediaan.map(([v, l]) => (
+                  <option key={v} value={v}>
+                    {l}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Jam akses">
+              <input name="hours" defaultValue={prefill?.hours} placeholder="Contoh: 06.00 - 18.00" className={inputCls} />
+            </Field>
+            <Field label="Nama pengelola">
+              <input name="owner" defaultValue={prefill?.owner} className={inputCls} />
+            </Field>
+            <Field label="Kontak pengelola">
+              <input name="phone" type="tel" defaultValue={prefill?.phone} className={inputCls} />
+            </Field>
           </div>
-        </form>
-      </div>
+
+          <Field label="Sumber informasi (opsional)">
+            <select name="infoSource" defaultValue={prefill?.infoSource ?? ""} className={inputCls}>
+              <option value="">Pilih sumber informasi</option>
+              {SUMBER_INFO_FORM.map((t) => (
+                <option key={t}>{t}</option>
+              ))}
+            </select>
+          </Field>
+
+          <Field label="Catatan tambahan">
+            <textarea name="note" rows={3} defaultValue={prefill?.note} placeholder="Biaya, antrean, aturan penggunaan" className={inputCls} />
+          </Field>
+
+          {error && (
+            <p role="alert" className="rounded-xl bg-aira-peach/30 px-4 py-3 text-sm font-medium leading-normal text-aira-danger-text">
+              {error}
+            </p>
+          )}
+        </div>
+
+        <div className="flex flex-col-reverse gap-3 border-t border-aira-primary/10 px-4 py-4 sm:flex-row sm:items-center sm:justify-end sm:px-8">
+          <button
+            type="button"
+            onClick={onClose}
+            className="min-h-[48px] w-full rounded-full px-6 py-3 font-semibold text-aira-primary transition-colors hover:bg-aira-primary/10 sm:w-auto"
+          >
+            Batal
+          </button>
+          <button
+            type="submit"
+            disabled={saving}
+            className="inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-full bg-aira-primary px-7 py-3 font-semibold text-white shadow-soft transition-colors hover:bg-aira-primary-dark disabled:opacity-70 sm:w-auto"
+          >
+            <Send className="size-5" /> {saving ? "Mengirim..." : editData ? "Kirim Ulang untuk Verifikasi" : "Kirim untuk Verifikasi"}
+          </button>
+        </div>
+      </form>
     </div>
   );
 }
