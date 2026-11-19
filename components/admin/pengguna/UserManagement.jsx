@@ -222,7 +222,7 @@ function UserDetailModal({ userId, onClose, onStatusUpdated }) {
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-100 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
@@ -284,7 +284,7 @@ function UserDetailModal({ userId, onClose, onStatusUpdated }) {
                 </div>
 
                 <div className="min-w-0 flex-1">
-                  <h3 className="break-words text-lg font-bold text-aira-primary">
+                  <h3 className="wrap-break-word text-lg font-bold text-aira-primary">
                     {user.full_name || "Nama belum diisi"}
                   </h3>
                   <p className="mt-1 break-all text-sm text-aira-text/65">
@@ -309,7 +309,7 @@ function UserDetailModal({ userId, onClose, onStatusUpdated }) {
                       <UserRound className="size-4" />
                       Nama lengkap
                     </div>
-                    <p className="mt-2 break-words text-sm font-medium text-aira-text">
+                    <p className="mt-2 wrap-break-word text-sm font-medium text-aira-text">
                       {user.full_name || "-"}
                     </p>
                   </div>
@@ -548,7 +548,7 @@ export default function UserManagement({ onClose, onChanged }) {
   return (
     <>
       <div
-        className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm"
+        className="fixed inset-0 z-90 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm"
         onMouseDown={(event) => {
           if (event.target === event.currentTarget) onClose();
         }}
@@ -692,7 +692,7 @@ export default function UserManagement({ onClose, onChanged }) {
               </div>
 
               <div className="overflow-x-auto px-3 pb-2 pt-3">
-                <table className="w-full min-w-[680px] table-fixed border-collapse text-left">
+                <table className="w-full min-w-170 table-fixed border-collapse text-left">
                   <colgroup>
                     <col className="w-[32%]" />
                     <col className="w-[14%]" />
@@ -734,10 +734,10 @@ export default function UserManagement({ onClose, onChanged }) {
                       users.map((user) => (
                         <tr
                           key={user.user_id}
-                          className="border-b border-aira-primary/[0.08] transition-colors last:border-b-0 hover:bg-aira-bg/60"
+                          className="border-b border-aira-primary/8 transition-colors last:border-b-0 hover:bg-aira-bg/60"
                         >
                           <td className="min-w-0 px-3 py-4 align-middle">
-                            <p className="break-words text-sm font-semibold leading-snug text-aira-primary">
+                            <p className="wrap-break-word text-sm font-semibold leading-snug text-aira-primary">
                               {user.full_name || "Nama belum diisi"}
                             </p>
                             <p className="mt-1 break-all text-xs leading-snug text-aira-text/55">
@@ -777,7 +777,7 @@ export default function UserManagement({ onClose, onChanged }) {
               </div>
 
               {/* PAGINATION */}
-              <div className="flex flex-col gap-3 border-t border-aira-primary/[0.08] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-col gap-3 border-t border-aira-primary/8 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-xs text-aira-text/55">
                   Halaman {pagination.current_page || 1} dari{" "}
                   {pagination.total_pages || 1}

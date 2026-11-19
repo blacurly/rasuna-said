@@ -11,6 +11,13 @@ const UI_TO_DATABASE_STATUS = {
   Ditolak: "rejected",
 };
 
+const ALLOWED_AVAILABILITY_STATUSES = [
+  "available",
+  "limited",
+  "unavailable",
+  "unknown",
+];
+
 export async function getAdminContributionsAction() {
   try {
     const data = await getAdminWaterPointContributions();
@@ -39,18 +46,47 @@ export async function reviewContributionAction({
   contributionId,
   status,
   notes,
+  availabilityStatus,
 }) {
   try {
     const reviewStatus = UI_TO_DATABASE_STATUS[status];
 
     if (!reviewStatus) {
-      throw new Error("Keputusan verifikasi tidak valid.");
+      throw new Error(
+        "Keputusan verifikasi tidak valid."
+      );
+    }
+
+    if (
+      reviewStatus === "approved" &&
+      !ALLOWED_AVAILABILITY_STATUSES.includes(
+        availabilityStatus
+      )
+    ) {
+      throw new Error(
+        "Pilih status ketersediaan titik air terlebih dahulu."
+      );
+    }
+
+    if (
+      availabilityStatus != null &&
+      !ALLOWED_AVAILABILITY_STATUSES.includes(
+        availabilityStatus
+      )
+    ) {
+      throw new Error(
+        "Status ketersediaan tidak valid."
+      );
     }
 
     const data = await reviewWaterPointContribution({
       contributionId,
       reviewStatus,
       reviewNotes: notes || null,
+      availabilityStatus:
+        reviewStatus === "approved"
+          ? availabilityStatus
+          : null,
     });
 
     return {

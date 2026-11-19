@@ -57,15 +57,15 @@ export default function VerificationTable({ data = [], onSelect, activeTab }) {
               data.map((item) => (
                 <tr
                   key={item.id}
-                  className="border-b border-aira-primary/[0.08] transition-colors last:border-b-0 hover:bg-aira-bg/60"
+                  className="border-b border-aira-primary/8 transition-colors last:border-b-0 hover:bg-aira-bg/60"
                 >
                   {/* Titik air */}
                   <td className="min-w-0 px-3 py-4 align-middle">
-                    <p className="break-words text-sm font-semibold leading-snug text-aira-primary">
+                    <p className="wrap-break-word text-sm font-semibold leading-snug text-aira-primary">
                       {item.name}
                     </p>
                     {subtitle(item) && (
-                      <p className="mt-1 break-words text-xs leading-snug text-aira-text/55">
+                      <p className="mt-1 wrap-break-word text-xs leading-snug text-aira-text/55">
                         {subtitle(item)}
                       </p>
                     )}
@@ -104,7 +104,7 @@ export default function VerificationTable({ data = [], onSelect, activeTab }) {
                       <ActionButton
                         onClick={() => onSelect(item)}
                         activeTab={activeTab}
-                        className="min-w-[88px] px-5 py-2"
+                        className="min-w-22 px-5 py-2"
                       />
                     </div>
                   </td>
@@ -132,11 +132,11 @@ export default function VerificationTable({ data = [], onSelect, activeTab }) {
               className="rounded-xl border border-aira-primary/10 bg-white p-4"
             >
               <div className="mb-3">
-                <p className="break-words text-sm font-semibold text-aira-primary">
+                <p className="wrap-break-word text-sm font-semibold text-aira-primary">
                   {item.name}
                 </p>
                 {subtitle(item) && (
-                  <p className="mt-1 text-xs text-aira-text/55">
+                  <p className="mt-1 wrap-break-word text-xs text-aira-text/55">
                     {subtitle(item)}
                   </p>
                 )}

@@ -7,6 +7,19 @@ const REVIEW_STATUS_LABELS = {
   rejected: "Ditolak",
 };
 
+const ALLOWED_REVIEW_STATUSES = [
+  "approved",
+  "rejected",
+  "needs_revision",
+];
+
+const ALLOWED_AVAILABILITY_STATUSES = [
+  "available",
+  "limited",
+  "unavailable",
+  "unknown",
+];
+
 function throwIfError(error) {
   if (error) {
     throw new Error(
@@ -35,8 +48,6 @@ async function getAuthenticatedClient() {
 async function getAdminClient() {
   const { supabase, user } = await getAuthenticatedClient();
 
-  // Pemeriksaan role dilakukan di server.
-  // Fungsi database ini juga digunakan oleh kebijakan RLS AIRA.
   const { data: isAdmin, error } = await supabase.rpc(
     "is_aira_admin"
   );
@@ -53,11 +64,17 @@ async function getAdminClient() {
 function formatSubmittedAt(value) {
   if (!value) return "-";
 
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "-";
+  }
+
   return new Intl.DateTimeFormat("id-ID", {
     dateStyle: "long",
     timeStyle: "short",
     timeZone: "Asia/Jakarta",
-  }).format(new Date(value));
+  }).format(date);
 }
 
 function formatCoordinates(latitude, longitude) {
@@ -79,7 +96,9 @@ function formatAddress(contribution) {
 
 function mapContributionToUI(contribution, latestReview) {
   const status =
-    latestReview?.review_status || "pending";
+    contribution.status ||
+    latestReview?.review_status ||
+    "pending";
 
   return {
     id: contribution.contribution_id,
@@ -92,9 +111,13 @@ function mapContributionToUI(contribution, latestReview) {
       REVIEW_STATUS_LABELS[status] ||
       "Menunggu Verifikasi",
 
-    availability:
-      contribution.proposed_availability_status ||
-      "unknown",
+    // Status usulan kontributor hanya untuk informasi admin.
+    proposedAvailability:
+      contribution.proposed_availability_status || "unknown",
+
+    // Status akhir tidak boleh mengambil keputusan dari kontributor.
+    // Admin menetapkan status ketersediaan setelah pemeriksaan.
+    availability: "unknown",
 
     contributor: contribution.contributor_user_id,
 
@@ -119,18 +142,23 @@ function mapContributionToUI(contribution, latestReview) {
       contribution.proposed_access_information ||
       "-",
 
-    notes:
-      latestReview?.review_notes ||
-      contribution.notes ||
-      "",
+    notes: contribution.notes || "",
+
+    adminReviewGuidance:
+      contribution.admin_review_guidance || "",
+
+    adminReviewNote:
+      contribution.admin_review_note || "",
 
     evidenceUrl: contribution.evidence_url || null,
 
     contributionType: contribution.contribution_type,
 
-    waterPointId: contribution.water_point_id,
+    waterPointId: contribution.water_point_id || null,
 
     reviewStatus: status,
+
+    reviewedAt: contribution.reviewed_at || null,
   };
 }
 
@@ -207,7 +235,9 @@ export async function submitWaterPointContribution(input) {
       !input.proposed_province_id ||
       !input.proposed_city_regency_id
     ) {
-      throw new Error("Provinsi dan kabupaten/kota wajib diisi.");
+      throw new Error(
+        "Provinsi dan kabupaten/kota wajib diisi."
+      );
     }
   }
 
@@ -215,7 +245,9 @@ export async function submitWaterPointContribution(input) {
     contributionType === "update_point" &&
     !input.water_point_id
   ) {
-    throw new Error("Titik air yang akan diperbarui wajib dipilih.");
+    throw new Error(
+      "Titik air yang akan diperbarui wajib dipilih."
+    );
   }
 
   const latitude = input.proposed_latitude;
@@ -232,7 +264,9 @@ export async function submitWaterPointContribution(input) {
     longitude !== "";
 
   if (hasLatitude !== hasLongitude) {
-    throw new Error("Latitude dan longitude harus diisi berpasangan.");
+    throw new Error(
+      "Latitude dan longitude harus diisi berpasangan."
+    );
   }
 
   const parsedLatitude = hasLatitude ? Number(latitude) : null;
@@ -250,6 +284,20 @@ export async function submitWaterPointContribution(input) {
     )
   ) {
     throw new Error("Koordinat tidak valid.");
+  }
+
+  const proposedAvailability =
+    input.proposed_availability_status || null;
+
+  if (
+    proposedAvailability !== null &&
+    !ALLOWED_AVAILABILITY_STATUSES.includes(
+      proposedAvailability
+    )
+  ) {
+    throw new Error(
+      "Status ketersediaan yang diusulkan tidak valid."
+    );
   }
 
   const payload = {
@@ -279,13 +327,13 @@ export async function submitWaterPointContribution(input) {
       : null,
 
     proposed_village: input.proposed_village || null,
-    proposed_address_detail: input.proposed_address_detail || null,
+    proposed_address_detail:
+      input.proposed_address_detail || null,
 
     proposed_latitude: parsedLatitude,
     proposed_longitude: parsedLongitude,
 
-    proposed_availability_status:
-      input.proposed_availability_status || null,
+    proposed_availability_status: proposedAvailability,
 
     proposed_access_information:
       input.proposed_access_information || null,
@@ -353,7 +401,9 @@ export async function getMyWaterPointContributions() {
   const latestReviewByContribution = new Map();
 
   for (const review of reviews || []) {
-    if (!latestReviewByContribution.has(review.contribution_id)) {
+    if (
+      !latestReviewByContribution.has(review.contribution_id)
+    ) {
       latestReviewByContribution.set(
         review.contribution_id,
         review
@@ -369,7 +419,10 @@ export async function getMyWaterPointContributions() {
     return {
       ...contribution,
       review: latestReview || null,
-      status: latestReview?.review_status || "pending",
+      status:
+        contribution.status ||
+        latestReview?.review_status ||
+        "pending",
     };
   });
 }
@@ -408,7 +461,9 @@ export async function getAdminWaterPointContributions() {
   const latestReviewByContribution = new Map();
 
   for (const review of reviews || []) {
-    if (!latestReviewByContribution.has(review.contribution_id)) {
+    if (
+      !latestReviewByContribution.has(review.contribution_id)
+    ) {
       latestReviewByContribution.set(
         review.contribution_id,
         review
@@ -436,6 +491,7 @@ export async function reviewWaterPointContribution({
   contributionId,
   reviewStatus,
   reviewNotes = null,
+  availabilityStatus = null,
 }) {
   const { supabase } = await getAdminClient();
 
@@ -445,14 +501,29 @@ export async function reviewWaterPointContribution({
     throw new Error("ID kontribusi tidak valid.");
   }
 
-  if (
-    !["approved", "rejected", "needs_revision"].includes(
-      reviewStatus
-    )
-  ) {
+  if (!ALLOWED_REVIEW_STATUSES.includes(reviewStatus)) {
     throw new Error("Status review tidak valid.");
   }
 
+  if (
+    availabilityStatus !== null &&
+    !ALLOWED_AVAILABILITY_STATUSES.includes(
+      availabilityStatus
+    )
+  ) {
+    throw new Error("Status ketersediaan tidak valid.");
+  }
+
+  if (
+    reviewStatus === "approved" &&
+    availabilityStatus === null
+  ) {
+    throw new Error(
+      "Pilih status ketersediaan sebelum menyetujui kontribusi."
+    );
+  }
+
+  // RPC tetap bertanggung jawab atas proses verifikasi kontribusi.
   const { data, error } = await supabase.rpc(
     "review_water_point_contribution",
     {
@@ -463,6 +534,40 @@ export async function reviewWaterPointContribution({
   );
 
   throwIfError(error);
+
+  // Status ketersediaan hanya diterapkan ketika kontribusi disetujui.
+  // Status pending/revisi/ditolak tidak mengubah data titik air.
+  if (reviewStatus === "approved") {
+    const { data: contribution, error: contributionError } =
+      await supabase
+        .from("water_point_contributions")
+        .select("water_point_id")
+        .eq("contribution_id", id)
+        .single();
+
+    throwIfError(contributionError);
+
+    const waterPointId = Number(contribution?.water_point_id);
+
+    if (
+      !Number.isSafeInteger(waterPointId) ||
+      waterPointId <= 0
+    ) {
+      throw new Error(
+        "Kontribusi sudah diproses, tetapi ID titik air hasil persetujuan tidak ditemukan. Periksa fungsi RPC review_water_point_contribution."
+      );
+    }
+
+    const { error: updateError } = await supabase
+      .from("water_points")
+      .update({
+        availability_status: availabilityStatus,
+        last_status_checked_at: new Date().toISOString(),
+      })
+      .eq("water_point_id", waterPointId);
+
+    throwIfError(updateError);
+  }
 
   return data;
 }
