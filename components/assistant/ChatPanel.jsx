@@ -7,6 +7,7 @@ import SuggestedPrompts from "./SuggestedPrompts";
 export default function ChatPanel({
   messages,
   loading,
+  historyLoading,
   error,
   onSelectPrompt,
   onRetry,
@@ -37,7 +38,9 @@ export default function ChatPanel({
           />
         ))}
 
-        {loading && <TypingIndicator />}
+        {loading && (
+        <TypingIndicator historyLoading={historyLoading} />
+        )} 
 
         {error && (
           <div
