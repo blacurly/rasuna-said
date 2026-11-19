@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { validateContributionPayload } from "@/lib/validation/contribution";
 
 const REVIEW_STATUS_LABELS = {
   pending: "Menunggu Verifikasi",
@@ -85,19 +86,46 @@ function formatCoordinates(latitude, longitude) {
   return `${latitude}, ${longitude}`;
 }
 
-function formatAddress(contribution) {
-  return [
+function formatAddress(contribution, regions = {}) {
+  const parts = [
     contribution.proposed_address_detail,
     contribution.proposed_village,
-  ]
-    .filter(Boolean)
-    .join(", ") || "-";
+    regions.districtName,
+    regions.regencyName,
+    regions.provinceName,
+    "Indonesia",
+  ].filter(Boolean);
+  const unique = parts.filter((part, index) =>
+    parts.findIndex((candidate) => candidate.toLocaleLowerCase("id-ID") === part.toLocaleLowerCase("id-ID")) === index
+  );
+  return unique.join(", ") || "-";
 }
 
-function mapContributionToUI(contribution, latestReview) {
+function parseManagerContact(value) {
+  const text = String(value || "").trim();
+  const marker = "Pengelola:";
+  const line = text.split("\n").find((item) => item.trim().startsWith(marker));
+  if (!line) return { name: "-", phone: "-" };
+
+  const raw = line.trim().slice(marker.length).trim();
+  if (!raw) return { name: "-", phone: "-" };
+
+  // Format lama: "Pengelola: Nama, 08xxxxxxxxxx". Nama dapat mengandung koma,
+  // sehingga hanya bagian terakhir yang diperlakukan sebagai nomor bila berisi digit.
+  const parts = raw.split(",").map((item) => item.trim()).filter(Boolean);
+  const last = parts.at(-1) || "";
+  const phoneCandidate = last.replace(/[\s().+-]/g, "");
+  const hasPhone = /^\d{8,15}$/.test(phoneCandidate);
+  return {
+    name: (hasPhone ? parts.slice(0, -1) : parts).join(", ") || "-",
+    phone: hasPhone ? last : "-",
+  };
+}
+
+function mapContributionToUI(contribution, latestReview, contributorName = null, regions = {}) {
   const status =
-    contribution.status ||
     latestReview?.review_status ||
+    contribution.status ||
     "pending";
 
   return {
@@ -119,7 +147,12 @@ function mapContributionToUI(contribution, latestReview) {
     // Admin menetapkan status ketersediaan setelah pemeriksaan.
     availability: "unknown",
 
-    contributor: contribution.contributor_user_id,
+    contributor:
+      contributorName ||
+      (contribution.contributor_user_id
+        ? `Warga #${String(contribution.contributor_user_id).slice(0, 6)}`
+        : "Warga"),
+    contributorUserId: contribution.contributor_user_id || null,
 
     submittedAt: formatSubmittedAt(
       contribution.submitted_at
@@ -128,19 +161,24 @@ function mapContributionToUI(contribution, latestReview) {
     category:
       contribution.proposed_water_source_type || "-",
 
-    contact: "-",
+    contact: (() => {
+      const contact = parseManagerContact(contribution.proposed_access_information);
+      return contact.phone !== "-"
+        ? `${contact.name} (${contact.phone})`
+        : contact.name;
+    })(),
+    managerName: parseManagerContact(contribution.proposed_access_information).name,
+    managerPhone: parseManagerContact(contribution.proposed_access_information).phone,
 
-    address: formatAddress(contribution),
+    address: formatAddress(contribution, regions),
 
     coordinates: formatCoordinates(
       contribution.proposed_latitude,
       contribution.proposed_longitude
     ),
 
-    description:
-      contribution.proposed_description ||
-      contribution.proposed_access_information ||
-      "-",
+    description: contribution.proposed_description || "-",
+    accessInformation: contribution.proposed_access_information || "-",
 
     notes: contribution.notes || "",
 
@@ -151,6 +189,7 @@ function mapContributionToUI(contribution, latestReview) {
       contribution.admin_review_note || "",
 
     evidenceUrl: contribution.evidence_url || null,
+    googleMapsUrl: contribution.evidence_url || null,
 
     contributionType: contribution.contribution_type,
 
@@ -209,10 +248,17 @@ export async function getPublicWaterPoints() {
 export async function submitWaterPointContribution(input) {
   const { supabase, user } = await getAuthenticatedClient();
 
-  if (!input || typeof input !== "object") {
-    throw new Error("Data kontribusi tidak valid.");
+  const validation = validateContributionPayload(input);
+  if (!validation.valid) {
+    const error = new Error(validation.errors.join(" "));
+    error.status = 422;
+    error.code = "CONTRIBUTION_VALIDATION_FAILED";
+    throw error;
   }
 
+  // Gunakan payload hasil validasi agar Server Action dan Route Handler
+  // menerapkan kontrak field serta aturan validasi yang sama.
+  input = validation.value;
   const contributionType = input.contribution_type;
 
   if (!["new_point", "update_point"].includes(contributionType)) {
@@ -420,8 +466,8 @@ export async function getMyWaterPointContributions() {
       ...contribution,
       review: latestReview || null,
       status:
-        contribution.status ||
         latestReview?.review_status ||
+        contribution.status ||
         "pending",
     };
   });
@@ -448,6 +494,39 @@ export async function getAdminWaterPointContributions() {
   const contributionIds = contributions.map(
     (item) => item.contribution_id
   );
+
+  const contributorIds = [...new Set(
+    contributions.map((item) => item.contributor_user_id).filter(Boolean)
+  )];
+  let contributorNameById = new Map();
+
+  if (contributorIds.length > 0) {
+    const { data: profiles, error: profileError } = await supabase
+      .from("users")
+      .select("user_id, full_name")
+      .in("user_id", contributorIds);
+
+    throwIfError(profileError);
+    contributorNameById = new Map(
+      (profiles || []).map((profile) => [profile.user_id, profile.full_name])
+    );
+  }
+
+  const provinceIds = [...new Set(contributions.map((item) => item.proposed_province_id).filter(Boolean))];
+  const regencyIds = [...new Set(contributions.map((item) => item.proposed_city_regency_id).filter(Boolean))];
+  const districtIds = [...new Set(contributions.map((item) => item.proposed_district_id).filter(Boolean))];
+  const [provinceResult, regencyResult, districtResult] = await Promise.all([
+    provinceIds.length ? supabase.from("provinces").select("province_id, province_name").in("province_id", provinceIds) : Promise.resolve({ data: [], error: null }),
+    regencyIds.length ? supabase.from("city_regencies").select("city_regency_id, city_regency_name").in("city_regency_id", regencyIds) : Promise.resolve({ data: [], error: null }),
+    districtIds.length ? supabase.from("districts").select("district_id, district_name").in("district_id", districtIds) : Promise.resolve({ data: [], error: null }),
+  ]);
+  throwIfError(provinceResult.error);
+  throwIfError(regencyResult.error);
+  throwIfError(districtResult.error);
+
+  const provinceNameById = new Map((provinceResult.data || []).map((item) => [Number(item.province_id), item.province_name]));
+  const regencyNameById = new Map((regencyResult.data || []).map((item) => [Number(item.city_regency_id), item.city_regency_name]));
+  const districtNameById = new Map((districtResult.data || []).map((item) => [Number(item.district_id), item.district_name]));
 
   const { data: reviews, error: reviewError } = await supabase
     .from("contribution_reviews")
@@ -478,7 +557,13 @@ export async function getAdminWaterPointContributions() {
 
     return mapContributionToUI(
       contribution,
-      latestReview
+      latestReview,
+      contributorNameById.get(contribution.contributor_user_id) || null,
+      {
+        provinceName: provinceNameById.get(Number(contribution.proposed_province_id)),
+        regencyName: regencyNameById.get(Number(contribution.proposed_city_regency_id)),
+        districtName: districtNameById.get(Number(contribution.proposed_district_id)),
+      }
     );
   });
 }

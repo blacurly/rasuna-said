@@ -6,6 +6,7 @@ import { Clock, Info, AlertCircle } from "lucide-react";
 import Overlay from "@/components/admin/titik-air/Overlay";
 import { VerificationBadge } from "@/components/StatusBadge";
 import { Field, inputCls } from "@/components/dashboard/DashboardFormUi";
+import { normalizeIndonesianPhone } from "@/lib/phone";
 
 export const KETERSEDIAAN = [
   "Tersedia",
@@ -33,6 +34,8 @@ export default function PanelEditTitikAir({
     titik?.availability || "Belum Diketahui"
   );
   const [jam, setJam] = useState(titik?.hours || "");
+  const [pengelola, setPengelola] = useState(titik?.contact || "");
+  const [telepon, setTelepon] = useState(titik?.phone || "");
   const [catatan, setCatatan] = useState(titik?.note || "");
   const [sumber, setSumber] = useState("");
   const [pesanError, setPesanError] = useState("");
@@ -41,7 +44,9 @@ export default function PanelEditTitikAir({
     name: nama.trim(),
     address: alamat.trim(),
     availability: ketersediaan,
-    hours: jam.trim() || "Belum diketahui",
+    hours: jam.trim() || "",
+    contact: pengelola.trim(),
+    phone: telepon.trim(),
     note: catatan.trim(),
   };
 
@@ -51,6 +56,8 @@ export default function PanelEditTitikAir({
     berikutnya.availability !==
       (titik?.availability || "Belum Diketahui") ||
     berikutnya.hours !== (titik?.hours || "") ||
+    berikutnya.contact !== (titik?.contact || "") ||
+    berikutnya.phone !== (titik?.phone || "") ||
     berikutnya.note !== (titik?.note || "");
 
   const bisaSimpan =
@@ -87,6 +94,14 @@ export default function PanelEditTitikAir({
       return;
     }
 
+    if (berikutnya.contact.length > 150) {
+      setPesanError("Nama pengelola maksimal 150 karakter.");
+      return;
+    }
+    if (berikutnya.phone && !normalizeIndonesianPhone(berikutnya.phone)) {
+      setPesanError("Nomor telepon pengelola tidak valid. Gunakan nomor Indonesia yang aktif.");
+      return;
+    }
     if (!berubah) {
       setPesanError("Belum ada perubahan yang perlu disimpan.");
       return;
@@ -193,7 +208,7 @@ export default function PanelEditTitikAir({
                 onClick={() => setKetersediaan(k)}
                 aria-pressed={ketersediaan === k}
                 disabled={sedangMenyimpan}
-                className={`min-h-[48px] rounded-2xl border-2 px-3 py-3 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+                className={`min-h-12 rounded-2xl border-2 px-3 py-3 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
                   ketersediaan === k
                     ? "border-aira-primary bg-aira-primary/10 text-aira-primary"
                     : "border-aira-primary/15 hover:bg-aira-bg"
@@ -215,6 +230,30 @@ export default function PanelEditTitikAir({
             placeholder="Contoh: Setiap hari, 06.00 - 18.00 WIB"
           />
         </Field>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Nama pengelola">
+            <input
+              value={pengelola}
+              onChange={(e) => setPengelola(e.target.value)}
+              maxLength={150}
+              disabled={sedangMenyimpan}
+              className={inputCls}
+              placeholder="Nama pengelola (opsional)"
+            />
+          </Field>
+          <Field label="Nomor telepon pengelola">
+            <input
+              type="tel"
+              value={telepon}
+              onChange={(e) => setTelepon(e.target.value)}
+              maxLength={24}
+              disabled={sedangMenyimpan}
+              className={inputCls}
+              placeholder="08xxxxxxxxxx"
+            />
+          </Field>
+        </div>
 
         <Field label="Catatan akses">
           <textarea
@@ -269,7 +308,7 @@ export default function PanelEditTitikAir({
           <button
             type="submit"
             disabled={!bisaSimpan}
-            className="min-h-[52px] w-full rounded-full bg-aira-primary px-8 py-3.5 font-semibold text-white shadow-soft transition-colors hover:bg-aira-primary-dark disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-aira-primary sm:w-auto"
+            className="min-h-13 w-full rounded-full bg-aira-primary px-8 py-3.5 font-semibold text-white shadow-soft transition-colors hover:bg-aira-primary-dark disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-aira-primary sm:w-auto"
           >
             {sedangMenyimpan ? "Menyimpan..." : "Simpan Perubahan"}
           </button>
@@ -278,7 +317,7 @@ export default function PanelEditTitikAir({
             type="button"
             onClick={onClose}
             disabled={sedangMenyimpan}
-            className="min-h-[52px] w-full rounded-full px-6 py-3.5 font-semibold text-aira-primary hover:bg-aira-primary/10 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+            className="min-h-13 w-full rounded-full px-6 py-3.5 font-semibold text-aira-primary hover:bg-aira-primary/10 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
           >
             Batal
           </button>

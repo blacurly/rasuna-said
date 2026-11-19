@@ -45,7 +45,7 @@ function TombolEdit({ onClick, penuh = false }) {
     <button
       type="button"
       onClick={onClick}
-      className={`${adminBtnOutline} min-w-[88px] ${
+      className={`${adminBtnOutline} min-w-22 ${
         penuh ? "mt-4 w-full" : ""
       }`}
     >
@@ -236,10 +236,10 @@ export default function KelolaTitikAir({
             {daftar.map((t) => (
               <tr
                 key={t.id}
-                className="border-b border-aira-primary/[0.08] transition-colors last:border-b-0 hover:bg-aira-bg/60"
+                className="border-b border-aira-primary/8 transition-colors last:border-b-0 hover:bg-aira-bg/60"
               >
                 <td className={td}>
-                  <p className="break-words text-sm font-semibold leading-snug text-aira-primary">
+                  <p className="wrap-break-word text-sm font-semibold leading-snug text-aira-primary">
                     {t.name || "Tanpa nama"}
                   </p>
                   <p className="mt-1 text-xs leading-snug text-aira-text/55">
@@ -281,7 +281,7 @@ export default function KelolaTitikAir({
               key={t.id}
               className="rounded-xl border border-aira-primary/10 bg-white p-4"
             >
-              <p className="break-words text-sm font-semibold text-aira-primary">
+              <p className="wrap-break-word text-sm font-semibold text-aira-primary">
                 {t.name || "Tanpa nama"}
               </p>
 
