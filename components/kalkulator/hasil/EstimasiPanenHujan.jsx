@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { CloudRain, Gauge, Home, MapPin } from "lucide-react";
+import { CloudRain, Gauge, Home, Info, MapPin } from "lucide-react";
 
 import { formatLokasiWilayah } from "@/lib/formatWilayah";
 import { salinHasilKeDraft } from "@/lib/hasilKalkulator";
@@ -26,6 +26,10 @@ export default function EstimasiPanenHujan({ hasil, masukan }) {
   );
 
   const luasAtap = Number(masukan?.luasAtap) || 0;
+
+  // Lokasi dan luas atap sudah diisi, tetapi AIRA belum punya data curah hujan untuk wilayah itu.
+  const wilayahDiisi = formatLokasiWilayah(masukan?.lokasi || hasil?.wilayah || "");
+  const tanpaDataCurahHujan = !bisaDihitung && Boolean(wilayahDiisi) && luasAtap > 0;
   const kebutuhanHarian = Number(hasil?.kebutuhanHarianLiter) || 0;
 
   const dasarEstimasi = [
@@ -147,21 +151,42 @@ export default function EstimasiPanenHujan({ hasil, masukan }) {
         </>
       ) : (
         <>
-          <div className="mt-5 rounded-2xl bg-white/80 px-4 py-4 text-aira-body leading-relaxed text-aira-text/80">
-            <p>
-              Estimasi panen air hujan belum dapat dihitung. Pilih lokasi dan
-              isi luas atap rumah pada kalkulator untuk memperoleh
-              estimasinya.
-            </p>
+          {tanpaDataCurahHujan ? (
+            <div className="mt-5 rounded-2xl bg-white/80 px-4 py-4 text-aira-body leading-relaxed text-aira-text/80">
+              <p className="flex items-start gap-2">
+                <Info
+                  className="mt-0.5 size-4 shrink-0 text-aira-primary"
+                  aria-hidden="true"
+                />
+                <span>
+                  Data curah hujan untuk wilayah{" "}
+                  <strong className="font-semibold">{wilayahDiisi}</strong>{" "}
+                  belum tersedia di AIRA, sehingga estimasi panen air hujan
+                  belum dapat dihitung.
+                </span>
+              </p>
 
-            <Link
-              href="/kalkulator-air"
-              onClick={() => salinHasilKeDraft()}
-              className="mt-2 inline-flex min-h-11 items-center text-sm font-bold text-aira-primary underline"
-            >
-              Lengkapi data panen hujan
-            </Link>
-          </div>
+              <p className="mt-2 text-sm leading-normal text-aira-text/65">
+                Hasil estimasi ketahanan air di atas tetap berlaku.
+              </p>
+            </div>
+          ) : (
+            <div className="mt-5 rounded-2xl bg-white/80 px-4 py-4 text-aira-body leading-relaxed text-aira-text/80">
+              <p>
+                Estimasi panen air hujan belum dapat dihitung. Pilih lokasi dan
+                isi luas atap rumah pada kalkulator untuk memperoleh
+                estimasinya.
+              </p>
+
+              <Link
+                href="/kalkulator-air"
+                onClick={() => salinHasilKeDraft()}
+                className="mt-2 inline-flex min-h-11 items-center text-sm font-bold text-aira-primary underline"
+              >
+                Lengkapi data panen hujan
+              </Link>
+            </div>
+          )}
 
           <p className="mt-4 text-[13px] leading-relaxed text-aira-text/70">
             {CATATAN_SIMULASI}
