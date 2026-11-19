@@ -214,4 +214,4 @@ export const ambilTitikAirTerverifikasi = cache(async () => {
   const wilayah = await ambilDataWilayah(supabase);
 
   return data.map((titik) => petakanTitikAir(titik, wilayah));
-});
+}); 

@@ -1,13 +1,23 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import { Droplets, Pencil, Search } from "lucide-react";
+import {
+  Droplets,
+  Pencil,
+  Search,
+  Plus,
+} from "lucide-react";
 
 import PanelEditTitikAir, {
   KETERSEDIAAN,
 } from "@/components/admin/titik-air/PanelEditTitikAir";
+
+import FormTambahTitikAir from "@/components/admin/titik-air/FormTambahTitikAir";
+
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
+
 import { formatCategory } from "@/components/admin/verifikasi-titik-air/formatters";
+
 import {
   adminCard,
   adminCardPad,
@@ -55,16 +65,18 @@ function TombolEdit({ onClick, penuh = false }) {
   );
 }
 
-// Kelola Titik Air (C03):
-// direktori titik air terverifikasi, pencarian, filter, dan panel edit.
 export default function KelolaTitikAir({
   awal = [],
   simpanTitikAirAction,
 }) {
   const [titik, setTitik] = useState(Array.isArray(awal) ? awal : []);
+
   const [kataKunci, setKataKunci] = useState("");
   const [filter, setFilter] = useState("Semua");
+
   const [editId, setEditId] = useState(null);
+  const [tambahTerbuka, setTambahTerbuka] = useState(false);
+
   const [pesan, setPesan] = useState(null);
   const [sedangMenyimpan, setSedangMenyimpan] = useState(false);
 
@@ -83,7 +95,8 @@ export default function KelolaTitikAir({
 
     return titik.filter((t) => {
       const cocokFilter =
-        filter === "Semua" || (t.availability || "Belum Diketahui") === filter;
+        filter === "Semua" ||
+        (t.availability || "Belum Diketahui") === filter;
 
       const teksPencarian = [
         t.name,
@@ -107,6 +120,7 @@ export default function KelolaTitikAir({
         type: "error",
         text: "Fitur penyimpanan belum terhubung ke Server Action. Perubahan belum disimpan.",
       });
+
       return { success: false };
     }
 
@@ -125,7 +139,6 @@ export default function KelolaTitikAir({
         );
       }
 
-      // Perbarui tampilan lokal hanya setelah server menyatakan berhasil.
       setTitik((daftarLama) =>
         daftarLama.map((item) =>
           item.id === id
@@ -145,6 +158,7 @@ export default function KelolaTitikAir({
       });
 
       setEditId(null);
+
       return { success: true };
     } catch (error) {
       console.error("Gagal menyimpan perubahan titik air:", error);
@@ -162,6 +176,15 @@ export default function KelolaTitikAir({
     }
   };
 
+  const bukaFormTambah = () => {
+    setPesan(null);
+    setTambahTerbuka(true);
+  };
+
+  const tutupFormTambah = () => {
+    setTambahTerbuka(false);
+  };
+
   return (
     <>
       <AdminPageHeader
@@ -169,6 +192,26 @@ export default function KelolaTitikAir({
         description="Direktori titik air terverifikasi yang tampil di Navigasi Air. Perbarui ketersediaan dan informasi operasional berdasarkan sumber informasi yang jelas."
       />
 
+      {/* =============================== */}
+      {/* ACTION TAMBAH TITIK AIR */}
+      {/* =============================== */}
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-sm text-aira-text/65">
+          Kelola data titik air dan tambahkan lokasi baru.
+        </p>
+
+        <button
+          type="button"
+          onClick={bukaFormTambah}
+          className="inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-full bg-aira-primary px-5 py-3 text-sm font-semibold text-white shadow-soft transition-colors hover:bg-aira-primary-dark sm:w-auto"
+        >
+          <Plus className="size-4" />
+          Tambah Titik Air
+        </button>
+      </div>
+
+      {/* FEEDBACK */}
       {pesan && (
         <p
           role={pesan.type === "error" ? "alert" : "status"}
@@ -182,11 +225,18 @@ export default function KelolaTitikAir({
         </p>
       )}
 
+      {/* =============================== */}
+      {/* DIREKTORI TITIK AIR */}
+      {/* =============================== */}
+
       <section className={`${adminCard} ${adminCardPad} w-full min-w-0`}>
+        {/* SEARCH DAN FILTER */}
         <div className="grid gap-3 md:grid-cols-[1fr_200px]">
           <label className="relative">
             <span className="sr-only">Cari titik air</span>
+
             <Search className="absolute left-4 top-1/2 size-4 -translate-y-1/2 text-aira-primary" />
+
             <input
               value={kataKunci}
               onChange={(e) => setKataKunci(e.target.value)}
@@ -202,6 +252,7 @@ export default function KelolaTitikAir({
             className={adminInput}
           >
             <option value="Semua">Semua</option>
+
             {KETERSEDIAAN.map((k) => (
               <option key={k} value={k}>
                 {k}
@@ -210,7 +261,7 @@ export default function KelolaTitikAir({
           </select>
         </div>
 
-        {/* Desktop: tabel */}
+        {/* DESKTOP TABLE */}
         <table className="mt-4 hidden w-full table-fixed border-collapse text-left lg:table">
           <colgroup>
             <col className="w-[32%]" />
@@ -242,6 +293,7 @@ export default function KelolaTitikAir({
                   <p className="break-words text-sm font-semibold leading-snug text-aira-primary">
                     {t.name || "Tanpa nama"}
                   </p>
+
                   <p className="mt-1 text-xs leading-snug text-aira-text/55">
                     {formatCategory(t.type)}
                   </p>
@@ -259,6 +311,7 @@ export default function KelolaTitikAir({
                   <p className="text-sm text-aira-text/80">
                     {t.hours || "Belum diketahui"}
                   </p>
+
                   <p className="mt-1 text-xs text-aira-text/55">
                     {t.updated || "Belum ada informasi pembaruan"}
                   </p>
@@ -274,7 +327,7 @@ export default function KelolaTitikAir({
           </tbody>
         </table>
 
-        {/* Mobile dan tablet: kartu */}
+        {/* MOBILE & TABLET CARD */}
         <ul className="mt-4 space-y-3 lg:hidden">
           {daftar.map((t) => (
             <li
@@ -305,21 +358,30 @@ export default function KelolaTitikAir({
                 {t.updated || "Belum ada informasi pembaruan"}
               </p>
 
-              <TombolEdit onClick={() => setEditId(t.id)} penuh />
+              <TombolEdit
+                onClick={() => setEditId(t.id)}
+                penuh
+              />
             </li>
           ))}
         </ul>
 
+        {/* EMPTY STATE */}
         {daftar.length === 0 && (
           <p className="mt-4 rounded-xl bg-aira-bg p-8 text-center text-sm text-aira-text/60">
             Tidak ada titik air yang cocok dengan pencarian.
           </p>
         )}
 
+        {/* JUMLAH DATA */}
         <p className="mt-4 text-xs text-aira-text/55">
           {daftar.length} dari {titik.length} titik air aktif
         </p>
       </section>
+
+      {/* =============================== */}
+      {/* PANEL EDIT */}
+      {/* =============================== */}
 
       {dipilih && (
         <PanelEditTitikAir
@@ -328,6 +390,16 @@ export default function KelolaTitikAir({
           onClose={tutupPanel}
           onSimpan={simpan}
           sedangMenyimpan={sedangMenyimpan}
+        />
+      )}
+
+      {/* =============================== */}
+      {/* PANEL TAMBAH */}
+      {/* =============================== */}
+
+      {tambahTerbuka && (
+        <FormTambahTitikAir
+          onClose={tutupFormTambah}
         />
       )}
     </>
