@@ -1,42 +1,68 @@
-import { reviewWaterPointContribution } from "@/services/contributionService";
-import { requireApiAdmin } from "@/lib/auth/authorization";
-import { apiSuccess, apiError, readJson, handleApiError } from "@/lib/api/response";
-import { revalidatePath } from "next/cache";
+import {
+  getAdminWaterPointContributions,
+} from "@/services/contributionService";
 
-const VALID_STATUS = new Set(["approved", "rejected", "needs_revision"]);
+import {
+  requireApiAdmin,
+} from "@/lib/auth/authorization";
 
-export async function PATCH(request, { params }) {
+import {
+  apiSuccess,
+  handleApiError,
+  getPagination,
+} from "@/lib/api/response";
+
+export async function GET(request) {
   try {
     await requireApiAdmin();
-    const { id } = await params;
-    const contributionId = Number(id);
-    if (!Number.isSafeInteger(contributionId) || contributionId <= 0) {
-      return apiError("ID kontribusi tidak valid.", { status: 400, code: "INVALID_ID" });
-    }
 
-    const body = await readJson(request);
-    if (!body || typeof body !== "object" || Array.isArray(body)) {
-      return apiError("Body JSON tidak valid.", { status: 400, code: "INVALID_JSON" });
-    }
+    const url = new URL(request.url);
 
-    if (!VALID_STATUS.has(body.reviewStatus)) {
-      return apiError("reviewStatus harus approved, rejected, atau needs_revision.", {
-        status: 422, code: "VALIDATION_ERROR",
-      });
-    }
+    const { limit, offset } = getPagination(
+      url.searchParams,
+      {
+        defaultLimit: 25,
+        maxLimit: 100,
+      }
+    );
 
-    const reviewNotes = body.reviewNotes == null ? null : String(body.reviewNotes).trim();
-    if (reviewNotes && reviewNotes.length > 2000) {
-      return apiError("Catatan verifikasi maksimal 2.000 karakter.", { status: 422, code: "VALIDATION_ERROR" });
-    }
+    const status = (
+      url.searchParams.get("status") || ""
+    ).trim();
 
-    const data = await reviewWaterPointContribution({ contributionId, reviewStatus: body.reviewStatus, reviewNotes });
-    revalidatePath("/navigasi-air");
-    revalidatePath("/admin/verifikasi");
-    revalidatePath("/dashboard/kontribusi");
+    const all =
+      await getAdminWaterPointContributions();
 
-    return apiSuccess(data, { message: "Keputusan verifikasi berhasil disimpan." });
+    const filtered = status
+      ? all.filter(
+          (item) => item.reviewStatus === status
+        )
+      : all;
+
+    return apiSuccess(
+      {
+        items: filtered.slice(
+          offset,
+          offset + limit
+        ),
+
+        pagination: {
+          limit,
+          offset,
+          total: filtered.length,
+          hasMore:
+            offset + limit < filtered.length,
+        },
+      },
+      {
+        message:
+          "Antrean kontribusi berhasil diambil.",
+      }
+    );
   } catch (error) {
-    return handleApiError(error, "Keputusan verifikasi gagal disimpan.");
+    return handleApiError(
+      error,
+      "Antrean kontribusi admin gagal dimuat."
+    );
   }
 }

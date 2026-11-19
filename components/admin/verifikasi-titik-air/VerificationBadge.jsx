@@ -5,6 +5,7 @@ import {
   XCircle,
   Droplets,
 } from "lucide-react";
+
 import { formatAvailability } from "./formatters";
 
 const badgeBase =
@@ -12,19 +13,38 @@ const badgeBase =
 
 export function VerificationBadge({ status }) {
   const styles = {
-    "Menunggu Verifikasi": { className: "bg-sky-100 text-sky-800", icon: Clock3 },
-    Terverifikasi: { className: "bg-aira-primary text-white", icon: CheckCircle2 },
-    "Perlu Perbaikan": { className: "bg-amber-100 text-amber-800", icon: AlertCircle },
-    Ditolak: { className: "bg-[#FCE3DC] text-[#A94D37]", icon: XCircle },
+    "Menunggu Verifikasi": {
+      className: "bg-sky-100 text-sky-800",
+      icon: Clock3,
+    },
+
+    Terverifikasi: {
+      className: "bg-aira-primary text-white",
+      icon: CheckCircle2,
+    },
+
+    "Perlu Perbaikan": {
+      className: "bg-amber-100 text-amber-800",
+      icon: AlertCircle,
+    },
+
+    Ditolak: {
+      className: "bg-[#FCE3DC] text-[#A94D37]",
+      icon: XCircle,
+    },
   };
 
-  const config = styles[status] || styles["Menunggu Verifikasi"];
+  const config =
+    styles[status] || styles["Menunggu Verifikasi"];
+
   const Icon = config.icon;
 
   return (
-    <span className={`${badgeBase} ${config.className}`}>
+    <span
+      className={`${badgeBase} ${config.className}`}
+    >
       <Icon size={13} className="shrink-0" />
-      {status}
+      {status || "Menunggu Verifikasi"}
     </span>
   );
 }
@@ -34,14 +54,23 @@ export function AvailabilityBadge({ status }) {
 
   const styles = {
     Tersedia: "bg-[#C8E9DF] text-[#286B59]",
+
     Terbatas: "bg-[#FCE8B5] text-[#87651D]",
-    "Belum Diketahui": "bg-[#E9ECEC] text-[#536267]",
+
+    "Tidak Tersedia":
+      "bg-[#FCE3DC] text-[#A94D37]",
+
+    "Belum Diketahui":
+      "bg-[#E9ECEC] text-[#536267]",
   };
 
+  const className =
+    styles[label] || styles["Belum Diketahui"];
+
   return (
-    <span className={`${badgeBase} ${styles[label]}`}>
+    <span className={`${badgeBase} ${className}`}>
       <Droplets size={13} className="shrink-0" />
       {label}
     </span>
   );
-} 
+}

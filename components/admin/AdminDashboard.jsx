@@ -72,7 +72,7 @@ function AdminStatCard({ stat }) {
     <Link
       href={destination}
       aria-label={`Lihat ${stat.title}`}
-      className={`${adminCard} group flex min-h-[128px] flex-col justify-between p-5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-aira-primary focus-visible:ring-offset-2`}
+      className={`${adminCard} group flex min-h-32 flex-col justify-between p-5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-aira-primary focus-visible:ring-offset-2`}
     >
       <div className="flex items-start justify-between gap-3">
         <p className="text-sm font-medium leading-snug text-aira-text/75">
@@ -82,7 +82,7 @@ function AdminStatCard({ stat }) {
         <div
           className={`flex size-9 shrink-0 items-center justify-center rounded-xl ${statColors[stat.color]}`}
         >
-          <Icon className="size-[18px]" />
+          <Icon className="size-4.5" />
         </div>
       </div>
 
@@ -158,7 +158,7 @@ function UserStatCard({ stat, value }) {
 
   return (
     <div
-      className={`${adminCard} flex min-h-[128px] flex-col justify-between p-5`}
+      className={`${adminCard} flex min-h-32 flex-col justify-between p-5`}
     >
       <div className="flex items-start justify-between gap-3">
         <p className="text-sm font-medium leading-snug text-aira-text/75">
@@ -168,7 +168,7 @@ function UserStatCard({ stat, value }) {
         <div
           className={`flex size-9 shrink-0 items-center justify-center rounded-xl ${stat.color}`}
         >
-          <Icon className="size-[18px]" />
+          <Icon className="size-4.5" />
         </div>
       </div>
 
@@ -275,7 +275,7 @@ function AdminUserStatistics({ refreshKey, onManage }) {
           ? USER_STAT_CONFIG.map((stat) => (
               <div
                 key={stat.id}
-                className={`${adminCard} min-h-[128px] animate-pulse p-5`}
+                className={`${adminCard} min-h-32 animate-pulse p-5`}
               >
                 <div className="h-4 w-28 rounded bg-gray-100" />
                 <div className="mt-6 h-8 w-16 rounded bg-gray-100" />
@@ -540,7 +540,7 @@ function AuditLogTable({ refreshKey }) {
 
       {/* TABEL */}
       <div className="overflow-x-auto px-4 pb-3 pt-4 sm:px-5 sm:pt-5">
-        <table className="w-full min-w-[900px] table-fixed border-collapse text-left">
+        <table className="w-full min-w-225 table-fixed border-collapse text-left">
           <colgroup>
             <col className="w-[15%]" />
             <col className="w-[14%]" />
@@ -574,13 +574,13 @@ function AuditLogTable({ refreshKey }) {
               logs.map((log) => (
                 <tr
                   key={log.activity_id}
-                  className="border-b border-aira-primary/[0.08] transition-colors last:border-b-0 hover:bg-aira-bg/60"
+                  className="border-b border-aira-primary/8 transition-colors last:border-b-0 hover:bg-aira-bg/60"
                 >
                   <td className="min-w-0 px-3 py-4 align-middle text-sm leading-snug text-aira-text/70">
                     {formatActivityDate(log.created_at)}
                   </td>
 
-                  <td className="min-w-0 break-words px-3 py-4 align-middle text-sm font-medium leading-snug text-aira-text">
+                  <td className="min-w-0 wrap-break-word px-3 py-4 align-middle text-sm font-medium leading-snug text-aira-text">
                     {log.admin_name || "Admin tidak ditemukan"}
                   </td>
 
@@ -592,7 +592,7 @@ function AuditLogTable({ refreshKey }) {
                   </td>
 
                   <td className="min-w-0 px-3 py-4 align-middle">
-                    <p className="break-words text-sm font-semibold leading-snug text-aira-primary">
+                    <p className="wrap-break-word text-sm font-semibold leading-snug text-aira-primary">
                       {log.target_user_name || "Pengguna tidak ditemukan"}
                     </p>
                     <p
@@ -633,7 +633,7 @@ function AuditLogTable({ refreshKey }) {
       </div>
 
       {/* FOOTER DAN PAGINATION */}
-      <div className="flex flex-col gap-3 border-t border-aira-primary/[0.08] px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+      <div className="flex flex-col gap-3 border-t border-aira-primary/8 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
         <p className="text-xs text-aira-text/55">
           Menampilkan {logs.length} dari{" "}
           {Number(pagination.total_data || 0).toLocaleString("id-ID")} aktivitas

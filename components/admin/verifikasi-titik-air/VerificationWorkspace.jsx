@@ -1,6 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 
 import {
   getAdminContributionsAction,
@@ -12,13 +17,13 @@ import VerificationTable from "./VerificationTable";
 import VerificationDetail from "./VerificationDetail";
 
 // Mengambil data dari Server Action.
-// Fungsi ini tidak mengubah state React.
 async function fetchContributions() {
   const result = await getAdminContributionsAction();
 
   if (!result?.success) {
     throw new Error(
-      result?.message || "Gagal mengambil data kontribusi."
+      result?.message ||
+        "Gagal mengambil data kontribusi."
     );
   }
 
@@ -35,7 +40,6 @@ export default function VerificationWorkspace() {
   const [error, setError] = useState("");
 
   // Pemuatan awal data dari database.
-  // State baru diperbarui setelah proses pengambilan data selesai.
   useEffect(() => {
     let isMounted = true;
 
@@ -48,11 +52,15 @@ export default function VerificationWorkspace() {
           setError("");
         }
       } catch (err) {
-        console.error("Gagal memuat kontribusi:", err);
+        console.error(
+          "Gagal memuat kontribusi:",
+          err
+        );
 
         if (isMounted) {
           setError(
-            err.message || "Terjadi kesalahan saat mengambil data."
+            err.message ||
+              "Terjadi kesalahan saat mengambil data."
           );
           setContributions([]);
         }
@@ -70,8 +78,7 @@ export default function VerificationWorkspace() {
     };
   }, []);
 
-  // Digunakan untuk memuat ulang data melalui interaksi pengguna
-  // atau setelah keputusan verifikasi berhasil disimpan.
+  // Memuat ulang data setelah interaksi pengguna.
   const loadContributions = useCallback(async () => {
     setLoading(true);
     setError("");
@@ -80,49 +87,59 @@ export default function VerificationWorkspace() {
       const data = await fetchContributions();
       setContributions(data);
     } catch (err) {
-      console.error("Gagal memuat ulang kontribusi:", err);
+      console.error(
+        "Gagal memuat ulang kontribusi:",
+        err
+      );
 
       setError(
-        err.message || "Terjadi kesalahan saat mengambil data."
+        err.message ||
+          "Terjadi kesalahan saat mengambil data."
       );
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // Jumlah kontribusi yang belum diverifikasi.
   const waitingCount = useMemo(() => {
     return contributions.filter(
       (item) =>
-        item.verificationStatus === "Menunggu Verifikasi"
+        item.verificationStatus ===
+        "Menunggu Verifikasi"
     ).length;
   }, [contributions]);
 
-  // Jumlah kontribusi yang sudah mendapatkan keputusan.
   const reviewedCount = useMemo(() => {
     return contributions.filter(
       (item) =>
-        item.verificationStatus !== "Menunggu Verifikasi"
+        item.verificationStatus !==
+        "Menunggu Verifikasi"
     ).length;
   }, [contributions]);
 
-  // Data yang ditampilkan mengikuti tab aktif.
   const filteredData = useMemo(() => {
     return contributions.filter((item) => {
       if (activeTab === "waiting") {
         return (
-          item.verificationStatus === "Menunggu Verifikasi"
+          item.verificationStatus ===
+          "Menunggu Verifikasi"
         );
       }
 
       return (
-        item.verificationStatus !== "Menunggu Verifikasi"
+        item.verificationStatus !==
+        "Menunggu Verifikasi"
       );
     });
   }, [contributions, activeTab]);
 
-  // Menyimpan keputusan verifikasi ke database.
-  async function handleUpdateStatus(id, status, notes) {
+  // Menyimpan keputusan verifikasi beserta status ketersediaan.
+  async function handleUpdateStatus(
+    id,
+    status,
+    notes,
+    availabilityStatus
+  ) {
     if (saving) return;
 
     setSaving(true);
@@ -133,6 +150,7 @@ export default function VerificationWorkspace() {
         contributionId: id,
         status,
         notes,
+        availabilityStatus,
       });
 
       if (!result?.success) {
@@ -142,14 +160,15 @@ export default function VerificationWorkspace() {
         );
       }
 
-      // Tutup detail dan pindah ke tab yang sudah ditinjau.
       setSelectedItem(null);
       setActiveTab("reviewed");
 
-      // Ambil kembali data terbaru dari database.
       await loadContributions();
     } catch (err) {
-      console.error("Gagal memperbarui status:", err);
+      console.error(
+        "Gagal memperbarui status:",
+        err
+      );
 
       setError(
         err.message ||
