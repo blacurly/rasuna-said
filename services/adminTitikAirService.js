@@ -2,6 +2,7 @@ import "server-only";
 
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
+import { normalizeIndonesianPhone } from "@/lib/phone";
 import {
   susunInformasiWilayah,
   susunMetadataSumber,
@@ -178,7 +179,7 @@ function petakanTitikAir(titik, wilayah) {
 
     provider: titik.provider || "",
     contact: titik.contact_person || "",
-    phone: titik.phone_number || "",
+    phone: normalizeIndonesianPhone(titik.phone_number) || "",
 
     locationHint: titik.location_hint || "",
     usagePurpose: titik.usage_purpose || "",

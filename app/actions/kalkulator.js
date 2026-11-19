@@ -742,20 +742,35 @@ export async function simpanRekomendasiAssessment(assessmentIdInput, items) {
 // formulir selalu sama dengan angka di halaman hasil.
 export async function ambilCurahHujanLokasi(lokasi) {
   if (typeof lokasi !== "string" || !lokasi.trim()) {
-    return { ok: false, curahHujanMmPerBulan: null };
+    return {
+      ok: false,
+      status: "unavailable",
+      reason: "invalid_location",
+      curahHujanMmPerBulan: null,
+    };
   }
 
   try {
     const data = await ambilRataRataCurahHujan(lokasi.trim());
     const mm = data?.curahHujanMmPerBulan;
+    const ok = data?.status === "available" &&
+      typeof mm === "number" && Number.isFinite(mm);
 
-    if (typeof mm !== "number" || !Number.isFinite(mm)) {
-      return { ok: false, curahHujanMmPerBulan: null };
-    }
-
-    return { ok: true, curahHujanMmPerBulan: Math.round(mm) };
+    return {
+      ok,
+      status: data?.status || "unavailable",
+      reason: data?.alasan || null,
+      curahHujanMmPerBulan: ok ? Math.round(mm) : null,
+      source: data?.sumberData || null,
+      period: data?.periodeData || null,
+    };
   } catch (error) {
     console.error("[AIRA] Pratinjau curah hujan gagal:", detailError(error));
-    return { ok: false, curahHujanMmPerBulan: null };
+    return {
+      ok: false,
+      status: "error",
+      reason: "external_service_unavailable",
+      curahHujanMmPerBulan: null,
+    };
   }
 }

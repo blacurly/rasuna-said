@@ -83,7 +83,7 @@ export default function KalkulatorForm({ awal = null }) {
 
   // Curah hujan untuk keterangan pada card Potensi Panen Air Hujan.
   // Diambil dari sumber yang sama dengan perhitungan akhir, begitu lokasi lengkap dipilih.
-  const [hujan, setHujan] = useState({ lokasi: "", mm: null });
+  const [hujan, setHujan] = useState({ lokasi: "", mm: null, status: "idle" });
 
   useEffect(() => {
     const lokasi = value.lokasi;
@@ -92,7 +92,7 @@ export default function KalkulatorForm({ awal = null }) {
     let aktif = true;
 
     ambilCurahHujanLokasi(lokasi).then((res) => {
-      if (aktif) setHujan({ lokasi, mm: res.ok ? res.curahHujanMmPerBulan : null });
+      if (aktif) setHujan({ lokasi, mm: res.ok ? res.curahHujanMmPerBulan : null, status: res.status || (res.ok ? "available" : "unavailable") });
     });
 
     return () => {
@@ -731,8 +731,9 @@ export default function KalkulatorForm({ awal = null }) {
                   </>
                 ) : (
                   <>
-                    Data curah hujan untuk lokasi ini belum tersedia, sehingga
-                    estimasi panen air hujan belum dapat dihitung.
+                    {hujan.status === "error"
+                      ? "Layanan data curah hujan sedang tidak dapat dihubungi. Perhitungan kebutuhan air tetap dapat dilanjutkan, tetapi estimasi panen air hujan belum tersedia."
+                      : "Data curah hujan untuk wilayah yang dipilih belum tersedia. Sistem tidak menggunakan data dari wilayah lain, sehingga estimasi panen air hujan belum dapat dihitung."}
                   </>
                 )}
 

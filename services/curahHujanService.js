@@ -8,7 +8,7 @@ async function fetchJson(url) {
   const response = await fetch(url, {
     method: "GET",
     headers: { Accept: "application/json" },
-    signal: AbortSignal.timeout(15000),
+    signal: AbortSignal.timeout(8000),
     cache: "no-store",
   });
 
@@ -47,22 +47,11 @@ function buatKandidatPencarian(lokasi) {
   const bagian = pecahLokasi(lokasi);
   const kandidat = [];
 
-  if (bagian.length > 0) {
-    kandidat.push(bagian[0]);
-  }
-
-  if (bagian.length > 1) {
-    kandidat.push(`${bagian[0]}, ${bagian[1]}`);
-    kandidat.push(bagian[1]);
-  }
-
-  if (bagian.length > 2) {
-    kandidat.push(`${bagian[1]}, ${bagian[2]}`);
-  }
-
+  if (bagian.length > 0) kandidat.push(bagian[0]);
+  if (bagian.length > 1) kandidat.push(`${bagian[0]}, ${bagian[1]}`);
   kandidat.push(lokasi);
 
-  return [...new Set(kandidat.filter(Boolean))];
+  return [...new Set(kandidat.filter(Boolean))].slice(0, 3);
 }
 
 function cocokDenganLokasi(tempat, lokasi) {
@@ -83,6 +72,9 @@ function cocokDenganLokasi(tempat, lokasi) {
 
   const gabunganHasil = bagianHasil.join(" ");
 
+  // Input yang hanya berisi nama negara/kosong tidak cukup spesifik.
+  if (bagianInput.length === 0) return false;
+
   // Pastikan seluruh komponen lokasi yang dimasukkan
   // ditemukan pada data administratif hasil geocoding.
   return bagianInput.every((bagian) =>
@@ -90,30 +82,20 @@ function cocokDenganLokasi(tempat, lokasi) {
   );
 }
 
-// Mencari koordinat lokasi. Jika kecamatan tidak ditemukan di layanan geocoding,
-// dipakai kabupaten/kota dan provinsi (curah hujan bulanan tidak berbeda jauh
-// antar kecamatan dalam satu kabupaten/kota).
+// Lokasi harus cocok dengan wilayah yang diminta. Jangan menurunkan tingkat
+// pencarian ke kabupaten/provinsi karena dapat memakai data wilayah lain.
 async function cariKoordinat(lokasi) {
-  const langsung = await cariKoordinatLangsung(lokasi);
-  if (langsung) return langsung;
-
-  const bagian = pecahLokasi(lokasi);
-  if (bagian.length >= 3) {
-    return cariKoordinatLangsung(bagian.slice(1).join(", "));
-  }
-
-  return null;
+  return cariKoordinatLangsung(lokasi);
 }
 
 async function cariKoordinatLangsung(lokasi) {
   const kandidat = buatKandidatPencarian(lokasi);
+  let adaResponsBerhasil = false;
+  let errorTerakhir = null;
 
   for (const nama of kandidat) {
     try {
-      const url = new URL(
-        "https://geocoding-api.open-meteo.com/v1/search"
-      );
-
+      const url = new URL("https://geocoding-api.open-meteo.com/v1/search");
       url.searchParams.set("name", nama);
       url.searchParams.set("count", "20");
       url.searchParams.set("language", "id");
@@ -121,50 +103,35 @@ async function cariKoordinatLangsung(lokasi) {
       url.searchParams.set("countryCode", "ID");
 
       const data = await fetchJson(url.toString());
-      const hasil = Array.isArray(data?.results)
-        ? data.results
-        : [];
-
+      adaResponsBerhasil = true;
+      const hasil = Array.isArray(data?.results) ? data.results : [];
       if (hasil.length === 0) continue;
 
-      const tempatCocok = hasil.find((item) => {
-        return (
-          item.country_code === "ID" &&
-          Number.isFinite(item.latitude) &&
-          Number.isFinite(item.longitude) &&
-          cocokDenganLokasi(item, lokasi)
-        );
-      });
+      const tempatCocok = hasil.find((item) =>
+        item.country_code === "ID" &&
+        Number.isFinite(item.latitude) &&
+        Number.isFinite(item.longitude) &&
+        cocokDenganLokasi(item, lokasi)
+      );
 
-      if (!tempatCocok) {
-        console.info(
-          `[curahHujanService] Hasil pencarian "${nama}" tidak cocok dengan lokasi input.`
-        );
-        continue;
-      }
+      if (!tempatCocok) continue;
 
       return {
         latitude: tempatCocok.latitude,
         longitude: tempatCocok.longitude,
-        nama: [
-          tempatCocok.name,
-          tempatCocok.admin3,
-          tempatCocok.admin2,
-          tempatCocok.admin1,
-          tempatCocok.country,
-        ]
+        nama: [tempatCocok.name, tempatCocok.admin3, tempatCocok.admin2, tempatCocok.admin1, tempatCocok.country]
           .filter(Boolean)
           .join(", "),
         tingkatLokasi: tempatCocok.name,
       };
     } catch (error) {
-      console.warn(
-        `[curahHujanService] Geocoding gagal untuk ${nama}:`,
-        error.message
-      );
+      errorTerakhir = error;
+      console.warn(`[curahHujanService] Geocoding gagal untuk ${nama}:`, error.message);
     }
   }
 
+  // Bedakan "wilayah memang tidak ditemukan" dari "semua request geocoding gagal".
+  if (!adaResponsBerhasil && errorTerakhir) throw errorTerakhir;
   return null;
 }
 
@@ -231,12 +198,18 @@ function hitungRataRataBulanan(data) {
 
 export async function ambilRataRataCurahHujan(lokasi) {
   if (typeof lokasi !== "string" || !lokasi.trim()) {
-    return null;
+    return {
+      status: "unavailable",
+      tersedia: false,
+      alasan: "invalid_location",
+      lokasi: null,
+      curahHujanMmPerBulan: null,
+      sumberData: "Open-Meteo Historical Weather API",
+    };
   }
 
   const lokasiBersih = lokasi.trim();
-  const cacheKey = lokasiBersih.toLowerCase();
-
+  const cacheKey = normalisasiNama(lokasiBersih);
   const cache = cacheCurahHujan.get(cacheKey);
 
   if (cache && Date.now() - cache.waktu < CACHE_TTL) {
@@ -244,44 +217,51 @@ export async function ambilRataRataCurahHujan(lokasi) {
   }
 
   try {
-    console.info(
-      "[curahHujanService] Mencari koordinat:",
-      lokasiBersih
-    );
-
+    console.info("[curahHujanService] Mencari koordinat lokasi:", lokasiBersih);
     const koordinat = await cariKoordinat(lokasiBersih);
 
     if (!koordinat) {
-      console.warn(
-        "[curahHujanService] Lokasi tidak dapat diverifikasi:",
-        lokasiBersih
-      );
-
-      return null;
+      const hasilTidakTersedia = {
+        status: "unavailable",
+        tersedia: false,
+        alasan: "location_not_found",
+        lokasi: lokasiBersih,
+        curahHujanMmPerBulan: null,
+        namaLokasiDitemukan: null,
+        latitude: null,
+        longitude: null,
+        periodeData: `${TAHUN_MULAI}-${TAHUN_AKHIR}`,
+        sumberData: "Open-Meteo Historical Weather API",
+      };
+      console.warn("[curahHujanService] Lokasi tidak ditemukan secara spesifik:", lokasiBersih);
+      return hasilTidakTersedia;
     }
-
-    console.info(
-      "[curahHujanService] Koordinat terverifikasi:",
-      koordinat
-    );
 
     const dataHistoris = await ambilDataHistoris(
       koordinat.latitude,
       koordinat.longitude
     );
-
     const rataRataMm = hitungRataRataBulanan(dataHistoris);
 
     if (rataRataMm === null) {
-      console.warn(
-        "[curahHujanService] Data curah hujan kosong:",
-        koordinat.nama
-      );
-
-      return null;
+      return {
+        status: "unavailable",
+        tersedia: false,
+        alasan: "precipitation_data_not_found",
+        lokasi: lokasiBersih,
+        namaLokasiDitemukan: koordinat.nama,
+        latitude: koordinat.latitude,
+        longitude: koordinat.longitude,
+        curahHujanMmPerBulan: null,
+        periodeData: `${TAHUN_MULAI}-${TAHUN_AKHIR}`,
+        sumberData: "Open-Meteo Historical Weather API",
+      };
     }
 
     const hasil = {
+      status: "available",
+      tersedia: true,
+      alasan: null,
       lokasi: lokasiBersih,
       namaLokasiDitemukan: koordinat.nama,
       latitude: koordinat.latitude,
@@ -292,23 +272,21 @@ export async function ambilRataRataCurahHujan(lokasi) {
       sumberData: "Open-Meteo Historical Weather API",
     };
 
-    cacheCurahHujan.set(cacheKey, {
-      waktu: Date.now(),
-      data: hasil,
-    });
-
-    console.info(
-      "[curahHujanService] Hasil curah hujan:",
-      hasil
-    );
-
+    cacheCurahHujan.set(cacheKey, { waktu: Date.now(), data: hasil });
     return hasil;
   } catch (error) {
-    console.error(
-      "[curahHujanService] Gagal mengambil data:",
-      error.message
-    );
+    console.error("[curahHujanService] Sumber data gagal:", {
+      lokasi: lokasiBersih,
+      message: error?.message || "Unknown error",
+    });
 
-    return null;
+    return {
+      status: "error",
+      tersedia: false,
+      alasan: "external_service_unavailable",
+      lokasi: lokasiBersih,
+      curahHujanMmPerBulan: null,
+      sumberData: "Open-Meteo Historical Weather API",
+    };
   }
 }

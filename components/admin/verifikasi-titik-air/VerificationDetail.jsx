@@ -214,7 +214,7 @@ export default function VerificationDetail({
 
             <Info
               icon={Phone}
-              label="Kontak"
+              label="Nama pengelola dan kontak"
               value={item.contact}
             />
           </div>
@@ -328,7 +328,7 @@ export default function VerificationDetail({
                   size={18}
                   className="text-aira-primary"
                 />
-                Bukti Pendukung
+                Tautan Lokasi / Bukti Pendukung
               </h4>
 
               <a
@@ -337,7 +337,7 @@ export default function VerificationDetail({
                 rel="noopener noreferrer"
                 className="text-sm font-medium text-aira-primary underline underline-offset-2 hover:text-aira-secondary"
               >
-                Lihat bukti yang dilampirkan
+                Buka tautan yang dikirim kontributor
               </a>
             </div>
           )}
@@ -448,7 +448,7 @@ function Info({ icon: Icon, label, value }) {
         {label}
       </p>
 
-      <p className="mt-1 break-words text-sm font-medium text-aira-text">
+      <p className="mt-1 wrap-break-word text-sm font-medium text-aira-text">
         {value || "-"}
       </p>
     </div>
