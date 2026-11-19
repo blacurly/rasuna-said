@@ -29,7 +29,20 @@ import {
   formatKoordinat,
 } from "@/lib/googleMaps";
 
+// Nilai kosong atau placeholder ("Belum diketahui", "-", dst.) dianggap tidak ada.
+const bersihkan = (nilai) => {
+  const teks = String(nilai ?? "").trim();
+  return /^(belum (diketahui|tercantum)|informasi belum tersedia|kontak belum tersedia|-|tidak ada)$/i.test(teks)
+    ? ""
+    : teks;
+};
+
 export default function DetailTitikAir({ titik }) {
+  const penyedia = bersihkan(titik.provider);
+  const namaKontak = bersihkan(titik.contact);
+  const telepon = bersihkan(titik.phone);
+  const adaKontak = Boolean(penyedia || namaKontak || telepon);
+
   const maps = buatTautanMaps(titik);
   const koordinat = formatKoordinat(titik);
 
@@ -290,7 +303,7 @@ export default function DetailTitikAir({ titik }) {
           <aside className="space-y-6 lg:col-span-5">
             {/* Google Maps */}
             <div className="rounded-[28px] bg-aira-primary p-6 text-white shadow-soft sm:p-7">
-              <h2 className="text-xl font-semibold">
+              <h2 className="text-xl font-semibold tracking-normal text-white">
                 Menuju lokasi
               </h2>
 
@@ -324,46 +337,56 @@ export default function DetailTitikAir({ titik }) {
               )}
             </div>
 
-            {/* Kontak pengelola */}
-            <div className="rounded-[28px] border border-aira-primary/5 bg-white p-6 shadow-soft sm:p-7">
-              <h2 className="text-xl font-semibold text-aira-primary">
-                Kontak pengelola
-              </h2>
+            {/* Kontak pengelola: disembunyikan bila tidak ada data kontak sama sekali. */}
+            {adaKontak && (
+              <div className="rounded-[28px] border border-aira-primary/5 bg-white p-6 shadow-soft sm:p-7">
+                <h2 className="text-xl font-semibold text-aira-primary">
+                  Kontak pengelola
+                </h2>
 
-              <div className="mt-5 space-y-4">
-                <div className="flex gap-3">
-                  <User className="mt-0.5 size-5 shrink-0 text-aira-peach" />
+                <div className="mt-5 space-y-4">
+                  {(penyedia || namaKontak) && (
+                    <div className="flex gap-3">
+                      <User className="mt-0.5 size-5 shrink-0 text-aira-peach" />
 
-                  <div>
-                    <p className="text-sm text-aira-text/60">
-                      Penyedia
-                    </p>
+                      <div>
+                        {penyedia && (
+                          <>
+                            <p className="text-sm text-aira-text/60">
+                              Penyedia
+                            </p>
 
-                    <p className="font-medium">
-                      {titik.provider || "Belum diketahui"}
-                    </p>
+                            <p className="font-medium">{penyedia}</p>
+                          </>
+                        )}
 
-                    <p className="text-aira-body text-aira-text/80">
-                      {titik.contact || "Informasi belum tersedia"}
-                    </p>
-                  </div>
+                        {namaKontak && (
+                          <p
+                            className={
+                              penyedia
+                                ? "text-aira-body text-aira-text/80"
+                                : "font-medium"
+                            }
+                          >
+                            {namaKontak}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {telepon && (
+                    <a
+                      href={`tel:${telepon.replace(/-/g, "")}`}
+                      className="flex min-h-13 items-center justify-center gap-2 rounded-full border-2 border-aira-primary px-6 py-3.5 font-semibold text-aira-primary transition-colors hover:bg-aira-primary/10"
+                    >
+                      <Phone className="size-5" />
+                      {telepon}
+                    </a>
+                  )}
                 </div>
-
-                {titik.phone ? (
-                  <a
-                    href={`tel:${titik.phone.replace(/-/g, "")}`}
-                    className="flex min-h-13 items-center justify-center gap-2 rounded-full border-2 border-aira-primary px-6 py-3.5 font-semibold text-aira-primary transition-colors hover:bg-aira-primary/10"
-                  >
-                    <Phone className="size-5" />
-                    {titik.phone}
-                  </a>
-                ) : (
-                  <p className="rounded-2xl bg-aira-bg p-4 text-sm text-aira-text/70">
-                    Kontak belum tersedia.
-                  </p>
-                )}
               </div>
-            </div>
+            )}
 
             <LaporkanInformasi />
 
