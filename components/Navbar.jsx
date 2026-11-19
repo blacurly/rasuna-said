@@ -49,15 +49,20 @@ export default function Navbar({ sesi = null }) {
     }
   };
 
-  // Dashboard pengguna memiliki header khusus.
-  // Mencegah Navbar global muncul dua kali.
-  if (pathname.startsWith("/dashboard")) {
-    return null;
-  }
+// Dashboard pengguna memiliki header khusus.
+// Mencegah Navbar global muncul dua kali.
+if (pathname.startsWith("/dashboard")) {
+  return null;
+}
 
-  // Kondisi halaman admin.
-  const isAdminPage = pathname.startsWith("/admin");
+// Halaman admin menggunakan sidebar dan header khusus.
+// Navbar global tidak ditampilkan pada seluruh route admin.
+if (pathname.startsWith("/admin")) {
+  return null;
+}
 
+// Kondisi halaman admin.
+const isAdminPage = pathname.startsWith("/admin");
   // Inisial untuk tombol Panel Admin.
   const adminInitials = "AA";
 
