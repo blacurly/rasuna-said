@@ -349,3 +349,11 @@ AIRA dikembangkan secara bertahap sesuai ruang lingkup Minimum Viable Product (M
 
 Implementasi integrasi AI, API, database, autentikasi, dan sumber data titik air dilakukan sesuai ketersediaan layanan serta keputusan teknis tim. Keberadaan nama file dalam dokumentasi tidak berarti integrasi tersebut sudah aktif.
 
+
+## 📚 Dokumentasi Backend
+
+- [Dokumentasi API](docs/API.md) — daftar endpoint, metode, akses, dan contoh request.
+- [Swagger UI](/api-docs) — dokumentasi interaktif saat aplikasi dijalankan.
+- [Dokumentasi teknis backend](docs/BACKEND_TECHNICAL.md) — arsitektur, service, tabel/RPC yang dipakai kode, dan environment variables.
+- [Checklist UAT](docs/UAT_CHECKLIST.md) — skenario pengujian TEST-01 sampai TEST-12.
+- [Audit backlog backend](docs/BE_BACKLOG_AUDIT.md) — perubahan yang sudah dilakukan dan pekerjaan yang masih terblokir.
