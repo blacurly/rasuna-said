@@ -250,6 +250,17 @@ const spec = {
           hasMore: { type: "boolean" },
         },
       },
+      AdminWaterPointRequest: {
+        type: "object",
+        properties: {
+          point_name: { type: "string", maxLength: 200 }, water_source_type: { type: "string" }, description: { type: ["string", "null"] },
+          province_id: { type: "integer" }, city_regency_id: { type: "integer" }, district_id: { type: ["integer", "null"] }, village: { type: ["string", "null"] },
+          address_detail: { type: ["string", "null"] }, latitude: { type: "number", minimum: -90, maximum: 90 }, longitude: { type: "number", minimum: -180, maximum: 180 },
+          availability_status: { type: "string", enum: ["available", "limited", "unavailable", "unknown"] }, access_information: { type: ["string", "null"] }, opening_hours: { type: ["string", "null"] },
+          quality_information: { type: ["string", "null"] }, provider: { type: ["string", "null"] }, contact_person: { type: ["string", "null"] }, phone_number: { type: ["string", "null"] },
+          location_hint: { type: ["string", "null"] }, usage_purpose: { type: ["string", "null"] }, information_source: { type: ["string", "null"] }, is_active: { type: "boolean" }, is_simulation: { type: "boolean" }, verification_status: { type: "string", enum: ["verified", "pending", "needs_revision", "rejected"] }
+        }
+      },
     },
   },
   paths: {
@@ -572,6 +583,15 @@ const spec = {
           "409": failure("Rumah tangga memiliki data turunan.", 409, "HOUSEHOLD_HAS_DEPENDENCIES", "Data keluarga tidak dapat dihapus karena masih memiliki data terkait."),
         },
       },
+    },
+    "/api/admin/water-points": {
+      get: { tags: ["Admin"], summary: "Daftar titik air untuk admin", description: "Admin aktif dapat melihat data titik air termasuk status dan data nonaktif. Mendukung q, verificationStatus, availabilityStatus, isActive, limit, offset.", security: [{ SupabaseCookieSession: [] }], parameters: [{ name: "q", in: "query", schema: { type: "string" } }, { name: "verificationStatus", in: "query", schema: { type: "string", enum: ["verified", "pending", "needs_revision", "rejected"] } }, { name: "availabilityStatus", in: "query", schema: { type: "string", enum: ["available", "limited", "unavailable", "unknown"] } }, { name: "isActive", in: "query", schema: { type: "boolean" } }, { name: "limit", in: "query", schema: { type: "integer", minimum: 1, maximum: 100 } }, { name: "offset", in: "query", schema: { type: "integer", minimum: 0 } }], responses: { "200": response("Daftar titik air", { success: true, message: "Data titik air admin berhasil diambil.", data: { items: [], pagination: { limit: 25, offset: 0, total: 0, hasMore: false } } }), "401": failure("Belum login", 401, "UNAUTHENTICATED", "Silakan masuk terlebih dahulu."), "403": failure("Akses admin ditolak", 403, "ADMIN_REQUIRED", "Akses khusus admin AIRA.") } },
+      post: { tags: ["Admin"], summary: "Tambah titik air langsung oleh admin", description: "Admin aktif menambahkan titik air. Backend menetapkan status verified, is_active, is_simulation, dan verified_by_user_id sesuai kebijakan server.", security: [{ SupabaseCookieSession: [] }], requestBody: { required: true, content: { "application/json": { schema: { $ref: "#/components/schemas/AdminWaterPointRequest" } } } }, responses: { "201": response("Titik air dibuat", { success: true, message: "Titik air berhasil ditambahkan.", data: {} }), "401": failure("Belum login", 401, "UNAUTHENTICATED", "Silakan masuk terlebih dahulu."), "403": failure("Akses admin ditolak", 403, "ADMIN_REQUIRED", "Akses khusus admin AIRA."), "422": failure("Validasi gagal", 422, "VALIDATION_ERROR", "Data titik air belum valid.") } }
+    },
+    "/api/admin/water-points/{id}": {
+      get: { tags: ["Admin"], summary: "Detail titik air untuk admin", security: [{ SupabaseCookieSession: [] }], parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer" } }], responses: { "200": response("Detail titik air", { success: true, message: "Detail titik air berhasil diambil.", data: {} }), "404": failure("Tidak ditemukan", 404, "NOT_FOUND", "Titik air tidak ditemukan.") } },
+      patch: { tags: ["Admin"], summary: "Perbarui data titik air", description: "Memperbarui field yang diizinkan; status reviewer tidak dapat ditentukan sebagai identitas dari client.", security: [{ SupabaseCookieSession: [] }], parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer" } }], requestBody: { required: true, content: { "application/json": { schema: { $ref: "#/components/schemas/AdminWaterPointRequest" } } } }, responses: { "200": response("Data diperbarui", { success: true, message: "Titik air berhasil diperbarui.", data: {} }), "404": failure("Tidak ditemukan", 404, "NOT_FOUND", "Titik air tidak ditemukan."), "422": failure("Validasi gagal", 422, "VALIDATION_ERROR", "Data titik air belum valid.") } },
+      delete: { tags: ["Admin"], summary: "Nonaktifkan titik air (soft delete)", description: "Menetapkan is_active=false; data tidak dihapus permanen untuk menjaga relasi dan riwayat.", security: [{ SupabaseCookieSession: [] }], parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer" } }], responses: { "200": response("Titik air dinonaktifkan", { success: true, message: "Titik air berhasil dinonaktifkan.", data: { water_point_id: 1, is_active: false } }), "404": failure("Tidak ditemukan", 404, "NOT_FOUND", "Titik air tidak ditemukan.") } }
     },
     "/api/profile": {
       get: {
