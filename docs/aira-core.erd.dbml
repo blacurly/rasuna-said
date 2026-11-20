@@ -1,0 +1,187 @@
+// ERD inti AIRA berdasarkan schema export yang diberikan.
+// Relasi dibuat sesuai foreign key yang terlihat; RLS tidak tercakup dalam DBML.
+Table users {
+  user_id uuid [pk]
+  full_name varchar
+  email varchar [unique]
+  role varchar
+  account_status varchar
+  phone_number varchar
+  created_at timestamptz
+  updated_at timestamptz
+}
+
+Table provinces {
+  province_id bigint [pk, increment]
+  province_name varchar
+}
+Table city_regencies {
+  city_regency_id bigint [pk, increment]
+  provinces_id bigint
+  city_regency_name varchar
+}
+Table districts {
+  district_id bigint [pk, increment]
+  province_id bigint
+  city_regency_id bigint
+  district_name varchar
+}
+
+Table households {
+  household_id bigint [pk, increment]
+  owner_user_id uuid
+  household_name varchar
+  province_id bigint
+  city_regency_id bigint
+  district_id bigint
+  village varchar
+  address_detail text
+  member_count int
+  water_source_type varchar
+  source_condition varchar
+  tank_capacity_liters numeric
+  water_volume_percentage numeric
+  has_mhm boolean
+  mhm_member_count int
+  roof_area_m2 numeric
+  created_at timestamptz
+  updated_at timestamptz
+}
+
+Table household_members {
+  member_id bigint [pk, increment]
+  household_id bigint
+  member_name varchar
+  birth_date date
+  gender varchar
+  daily_water_need_liters numeric
+  special_sanitation_needs text
+}
+
+Table water_assessments {
+  assessment_id bigint [pk, increment]
+  household_id bigint
+  assessed_by_user_id uuid
+  available_water_liters numeric
+  daily_need_liters numeric
+  estimated_duration_days numeric
+  water_condition varchar
+  crisis_mode boolean
+  assessment_notes text
+  assessed_at timestamptz
+  input_snapshot jsonb
+}
+
+Table assessment_recommendations {
+  recommendation_id bigint [pk, increment]
+  assessment_id bigint
+  guide_id bigint
+  recommendation_title varchar
+  recommendation_detail text
+  priority varchar
+  action_status varchar
+  created_at timestamptz
+}
+
+Table guides {
+  guide_id bigint [pk, increment]
+  title varchar
+  category varchar
+  summary text
+  content text
+  relevant_condition varchar
+  source_name varchar
+  source_url text
+  is_published boolean
+}
+
+Table water_points {
+  water_point_id bigint [pk, increment]
+  point_name varchar
+  water_source_type varchar
+  province_id bigint
+  city_regency_id bigint
+  district_id bigint
+  availability_status varchar
+  verification_status varchar
+  is_active boolean
+  verified_by_user_id uuid
+  is_simulation boolean
+  maps_url text
+}
+
+Table water_point_contributions {
+  contribution_id bigint [pk, increment]
+  contributor_user_id uuid
+  water_point_id bigint
+  contribution_type varchar
+  proposed_point_name varchar
+  proposed_water_source_type varchar
+  proposed_province_id bigint
+  proposed_city_regency_id bigint
+  proposed_district_id bigint
+  proposed_latitude numeric
+  proposed_longitude numeric
+  status varchar
+  submitted_at timestamptz
+  updated_at timestamptz
+  reviewed_by uuid
+  reviewed_at timestamptz
+}
+
+Table contribution_reviews {
+  review_id bigint [pk, increment]
+  contribution_id bigint
+  reviewer_user_id uuid
+  review_status varchar
+  review_notes text
+  reviewed_at timestamptz
+}
+
+Table assistant_interactions {
+  interaction_id bigint [pk, increment]
+  user_id uuid
+  household_id bigint
+  assessment_id bigint
+  guide_id bigint
+  user_question text
+  assistant_response text
+  created_at timestamptz
+}
+
+Table admin_activity_logs {
+  activity_id bigint [pk, increment]
+  admin_id uuid
+  action_type text
+  target_user_id uuid
+  old_status text
+  new_status text
+  description text
+  metadata jsonb
+  created_at timestamptz
+}
+
+Ref: users.user_id - households.owner_user_id
+Ref: users.user_id - water_assessments.assessed_by_user_id
+Ref: households.household_id - household_members.household_id
+Ref: households.household_id - water_assessments.household_id
+Ref: water_assessments.assessment_id - assessment_recommendations.assessment_id
+Ref: guides.guide_id - assessment_recommendations.guide_id
+Ref: users.user_id - water_points.verified_by_user_id
+Ref: users.user_id - water_point_contributions.contributor_user_id
+Ref: water_points.water_point_id - water_point_contributions.water_point_id
+Ref: water_point_contributions.contribution_id - contribution_reviews.contribution_id
+Ref: users.user_id - contribution_reviews.reviewer_user_id
+Ref: users.user_id - assistant_interactions.user_id
+Ref: households.household_id - assistant_interactions.household_id
+Ref: water_assessments.assessment_id - assistant_interactions.assessment_id
+Ref: guides.guide_id - assistant_interactions.guide_id
+Ref: provinces.province_id - city_regencies.provinces_id
+Ref: provinces.province_id - districts.province_id
+Ref: city_regencies.city_regency_id - districts.city_regency_id
+Ref: provinces.province_id - households.province_id
+Ref: city_regencies.city_regency_id - households.city_regency_id
+Ref: districts.district_id - households.district_id
+Ref: provinces.province_id - water_points.province_id
+Ref: city_regencies.city_regency_id - water_points.city_regency_id
+Ref: districts.district_id - water_points.district_id

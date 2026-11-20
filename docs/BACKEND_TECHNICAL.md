@@ -1,9 +1,9 @@
 # AIRA — Dokumentasi Teknis Backend
 
-Versi audit: 19 November 2026  
-Basis: source code dalam `AIRA-for-every-women.zip`.
+Versi audit: 20 November 2026  
+Basis: `aira-website` dan schema export SQL.
 
-> Dokumen ini menjelaskan implementasi yang terlihat di repository. Definisi SQL lengkap, isi kebijakan RLS, trigger, constraint, dan source function PostgreSQL belum disertakan dalam ZIP. Bagian tersebut sengaja ditandai belum diverifikasi dan tidak boleh dianggap sebagai dokumentasi database final.
+> Dokumen ini menjelaskan implementasi yang terlihat di repository dan relasi tabel dari schema export. RLS policies, grants, trigger, dan source function PostgreSQL belum disertakan dalam export sehingga belum dapat diverifikasi.
 
 ## 1. Arsitektur
 
@@ -46,7 +46,7 @@ Nama berikut berasal dari query repository; kolom yang disebut merupakan kolom y
 
 ### Database yang masih perlu diverifikasi
 
-- Definisi lengkap tabel, tipe data, default, foreign key, unique constraint, check constraint, trigger, dan index.
+- Definisi RLS policies, grants, trigger, function/RPC, dan ON DELETE behavior aktual. Schema tabel/foreign key tersedia pada `docs/DB_SCHEMA_AUDIT.md` dan ERD `docs/aira-core-erd.dbml`.
 - SQL body dan signature aktual `review_water_point_contribution`, `is_aira_admin`, serta `match_document_chunks`.
 - Kebijakan RLS untuk seluruh tabel di atas, termasuk anon, authenticated user, dan admin.
 - Apakah `water_point_contributions` sudah memiliki kolom terpisah untuk nama pengelola, nomor HP, dan Google Maps URL. Form saat ini menyimpan informasi pengelola di `proposed_access_information` dan link Maps di `evidence_url`.

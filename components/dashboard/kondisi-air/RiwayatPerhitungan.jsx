@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Calculator } from "lucide-react";
+import { Calculator, Trash2 } from "lucide-react";
 
 import { simpanDraftKalkulator } from "@/lib/hasilKalkulator";
 import { formatDesimal } from "@/lib/statusDashboard";
@@ -24,6 +24,38 @@ export default function RiwayatPerhitungan({ riwayat, baru = false }) {
   const router = useRouter();
 
   // "Hitung ulang": isi draft Kalkulator dengan data perhitungan ini, lalu buka Kalkulator.
+  async function ubahCatatan(r) {
+    const nilai = window.prompt("Catatan asesmen (maksimal 2.000 karakter):", r.catatanAsesmen || "");
+    if (nilai === null) return;
+    if (nilai.length > 2000) {
+      window.alert("Catatan maksimal 2.000 karakter.");
+      return;
+    }
+    const response = await fetch(`/api/water-assessments/${r.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ assessment_notes: nilai }),
+    });
+    const result = await response.json().catch(() => null);
+    if (!response.ok || !result?.success) {
+      window.alert(result?.message || "Catatan asesmen belum dapat diperbarui.");
+      return;
+    }
+    router.refresh();
+  }
+
+  async function hapusRiwayat(r) {
+    const yakin = window.confirm("Hapus riwayat perhitungan ini? Data yang sudah memiliki rekomendasi atau interaksi Assistant tidak dapat dihapus.");
+    if (!yakin) return;
+    const response = await fetch(`/api/water-assessments/${r.id}`, { method: "DELETE" });
+    const result = await response.json().catch(() => null);
+    if (!response.ok || !result?.success) {
+      window.alert(result?.message || "Riwayat belum dapat dihapus. Coba muat ulang halaman.");
+      return;
+    }
+    router.refresh();
+  }
+
   function hitungUlang(r) {
     const persen = Math.min(100, Math.round((r.liter / r.kapasitasTandonLiter) * 20) * 5);
 
@@ -124,13 +156,30 @@ export default function RiwayatPerhitungan({ riwayat, baru = false }) {
                       </span>
                     </td>
                     <td className="px-2.5 py-3.5 text-right align-middle">
-                      <button
-                        type="button"
-                        onClick={() => hitungUlang(r)}
-                        className="min-h-[36px] whitespace-nowrap rounded-full border border-aira-primary/30 px-3 py-1.5 text-xs font-semibold text-aira-primary hover:bg-aira-primary/10"
-                      >
-                        Hitung ulang
-                      </button>
+                      <div className="flex flex-wrap justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => ubahCatatan(r)}
+                          className="min-h-[36px] whitespace-nowrap rounded-full border border-aira-primary/20 px-3 py-1.5 text-xs font-semibold text-aira-primary hover:bg-aira-primary/10"
+                        >
+                          Catatan
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => hitungUlang(r)}
+                          className="min-h-[36px] whitespace-nowrap rounded-full border border-aira-primary/30 px-3 py-1.5 text-xs font-semibold text-aira-primary hover:bg-aira-primary/10"
+                        >
+                          Hitung ulang
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => hapusRiwayat(r)}
+                          aria-label={`Hapus riwayat ${r.tanggalPenuh}`}
+                          className="inline-flex min-h-[36px] items-center gap-1 whitespace-nowrap rounded-full border border-aira-danger-text/30 px-3 py-1.5 text-xs font-semibold text-aira-danger-text hover:bg-aira-peach/20"
+                        >
+                          <Trash2 className="size-3.5" /> Hapus
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -179,13 +228,30 @@ export default function RiwayatPerhitungan({ riwayat, baru = false }) {
                   </div>
                 </dl>
 
-                <button
-                  type="button"
-                  onClick={() => hitungUlang(r)}
-                  className="mt-4 min-h-[44px] w-full rounded-full border border-aira-primary/30 px-4 py-2.5 text-sm font-semibold text-aira-primary hover:bg-aira-primary/10"
-                >
-                  Hitung ulang
-                </button>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => ubahCatatan(r)}
+                    className="min-h-[44px] rounded-full border border-aira-primary/20 px-4 py-2.5 text-sm font-semibold text-aira-primary hover:bg-aira-primary/10"
+                  >
+                    Catatan
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => hitungUlang(r)}
+                    className="min-h-[44px] flex-1 rounded-full border border-aira-primary/30 px-4 py-2.5 text-sm font-semibold text-aira-primary hover:bg-aira-primary/10"
+                  >
+                    Hitung ulang
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => hapusRiwayat(r)}
+                    aria-label={`Hapus riwayat ${r.tanggalPenuh}`}
+                    className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full border border-aira-danger-text/30 px-4 py-2.5 text-sm font-semibold text-aira-danger-text hover:bg-aira-peach/20"
+                  >
+                    <Trash2 className="size-4" /> Hapus
+                  </button>
+                </div>
               </li>
             ))}
           </ul>

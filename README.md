@@ -357,3 +357,10 @@ Implementasi integrasi AI, API, database, autentikasi, dan sumber data titik air
 - [Dokumentasi teknis backend](docs/BACKEND_TECHNICAL.md) — arsitektur, service, tabel/RPC yang dipakai kode, dan environment variables.
 - [Checklist UAT](docs/UAT_CHECKLIST.md) — skenario pengujian TEST-01 sampai TEST-12.
 - [Audit backlog backend](docs/BE_BACKLOG_AUDIT.md) — perubahan yang sudah dilakukan dan pekerjaan yang masih terblokir.
+
+## Dokumentasi backend dan database
+
+- API dan Swagger UI: `/api-docs` (OpenAPI JSON: `/api/openapi`).
+- Audit skema, relasi, dan catatan RLS: [`docs/DB_SCHEMA_AUDIT.md`](docs/DB_SCHEMA_AUDIT.md).
+- ERD inti (DBML): [`docs/aira-core-erd.dbml`](docs/aira-core-erd.dbml).
+- Checklist pengujian CRUD dan RLS: [`docs/UAT_CHECKLIST.md`](docs/UAT_CHECKLIST.md).

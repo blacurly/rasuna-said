@@ -1,9 +1,9 @@
-import { CalendarDays, MapPin, MessageSquareWarning } from "lucide-react";
+import { CalendarDays, MapPin, MessageSquareWarning, Trash2 } from "lucide-react";
 
 import VerificationBadge from "./VerificationBadge";
 
 // Daftar kartu "Kontribusi Anda" sesuai Figma Make.
-export default function ContributionList({ items, onEdit }) {
+export default function ContributionList({ items, onEdit, onDelete }) {
   return (
     <ul className="mt-4 space-y-4">
       {items.map((s) => (
@@ -36,15 +36,26 @@ export default function ContributionList({ items, onEdit }) {
             </p>
           )}
 
-          {s.status === "Perlu Perbaikan" && (
-            <button
-              type="button"
-              onClick={() => onEdit(s)}
-              className="mt-3 inline-flex min-h-[44px] items-center justify-center rounded-full border-2 border-aira-primary px-5 py-2.5 font-semibold text-aira-primary transition-colors hover:bg-aira-primary/10"
-            >
-              Perbaiki dan Kirim Ulang
-            </button>
-          )}
+          <div className="mt-3 flex flex-wrap gap-2">
+            {s.status === "Perlu Perbaikan" && (
+              <button
+                type="button"
+                onClick={() => onEdit(s)}
+                className="inline-flex min-h-[44px] items-center justify-center rounded-full border-2 border-aira-primary px-5 py-2.5 font-semibold text-aira-primary transition-colors hover:bg-aira-primary/10"
+              >
+                Perbaiki dan Kirim Ulang
+              </button>
+            )}
+            {s.status === "Menunggu Verifikasi" && (
+              <button
+                type="button"
+                onClick={() => onDelete(s)}
+                className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full border border-aira-danger-text/30 px-4 py-2.5 text-sm font-semibold text-aira-danger-text transition-colors hover:bg-aira-peach/20"
+              >
+                <Trash2 className="size-4" /> Batalkan kontribusi
+              </button>
+            )}
+          </div>
         </li>
       ))}
     </ul>
