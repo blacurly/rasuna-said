@@ -1,11 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { Clock, Info, AlertCircle } from "lucide-react";
+import { Clock, Info } from "lucide-react";
 
-import Overlay from "@/components/admin/titik-air/Overlay";
+import Modal from "@/components/admin/titik-air/Modal";
+import { Alert } from "@/components/admin/titik-air/PesanUi";
+import {
+  kolomForm,
+  kolomSalah,
+  tombolGhost,
+  tombolUtama,
+} from "@/components/admin/titik-air/titikAirStyles";
 import { VerificationBadge } from "@/components/StatusBadge";
-import { Field, inputCls } from "@/components/dashboard/DashboardFormUi";
+import { Field } from "@/components/dashboard/DashboardFormUi";
 import { normalizeIndonesianPhone } from "@/lib/phone";
 
 export const KETERSEDIAAN = [
@@ -22,11 +29,25 @@ const SUMBER_PEMBARUAN = [
   "Lainnya",
 ];
 
+// Modal "Edit titik air" (Figma Make: EditModal). Namanya masih PanelEditTitikAir
+// supaya import di file lain tidak berubah, tetapi tampilannya sekarang modal
+// terpusat, bukan panel samping kanan.
+//
+// Props:
+//  - titik             : data titik air yang diedit
+//  - menyimpan         : tampilan "Menyimpan..." (proses asli ATAU pratinjau)
+//  - terkunci          : proses simpan ASLI sedang berjalan -> modal tak boleh ditutup
+//  - galatPratinjau    : tampilkan kotak galat contoh (state "Edit galat")
+//  - pratinjauTerkunci : state pratinjau yang tidak boleh mengirim form
+//  - onClose, onSimpan : callback dari KelolaTitikAir
 export default function PanelEditTitikAir({
   titik,
+  menyimpan = false,
+  terkunci = false,
+  galatPratinjau = false,
+  pratinjauTerkunci = false,
   onClose,
   onSimpan,
-  sedangMenyimpan = false,
 }) {
   const [nama, setNama] = useState(titik?.name || "");
   const [alamat, setAlamat] = useState(titik?.address || "");
@@ -38,38 +59,76 @@ export default function PanelEditTitikAir({
   const [telepon, setTelepon] = useState(titik?.phone || "");
   const [catatan, setCatatan] = useState(titik?.note || "");
   const [sumber, setSumber] = useState("");
-  const [pesanError, setPesanError] = useState("");
 
+  const [sudahCoba, setSudahCoba] = useState(false); // sudah menekan Simpan minimal sekali
+  const [galatServer, setGalatServer] = useState("");
+
+  // Nilai yang akan dikirim ke server (sudah dirapikan).
   const berikutnya = {
     name: nama.trim(),
     address: alamat.trim(),
     availability: ketersediaan,
-    hours: jam.trim() || "",
+    hours: jam.trim(),
     contact: pengelola.trim(),
     phone: telepon.trim(),
     note: catatan.trim(),
   };
 
+  // Apakah ada yang berubah dibanding data awal?
   const berubah =
     berikutnya.name !== (titik?.name || "") ||
     berikutnya.address !== (titik?.address || "") ||
-    berikutnya.availability !==
-      (titik?.availability || "Belum Diketahui") ||
+    berikutnya.availability !== (titik?.availability || "Belum Diketahui") ||
     berikutnya.hours !== (titik?.hours || "") ||
     berikutnya.contact !== (titik?.contact || "") ||
     berikutnya.phone !== (titik?.phone || "") ||
     berikutnya.note !== (titik?.note || "");
 
-  const bisaSimpan =
-    berubah &&
-    !!berikutnya.name &&
-    !!berikutnya.address &&
-    !!sumber &&
-    !sedangMenyimpan;
+  // Pesan validasi (string kosong = valid). Urutan sama dengan Figma Make.
+  function cariMasalah() {
+    if (!berubah) return "Belum ada perubahan untuk disimpan.";
+    if (!berikutnya.name || !berikutnya.address || !sumber) {
+      return "Lengkapi nama, alamat, dan sumber pembaruan.";
+    }
+    if (berikutnya.contact.length > 150) {
+      return "Nama pengelola maksimal 150 karakter.";
+    }
+    if (berikutnya.phone && !normalizeIndonesianPhone(berikutnya.phone)) {
+      return "Nomor telepon pengelola tidak valid. Gunakan nomor Indonesia yang aktif.";
+    }
+    return "";
+  }
 
+  // Hint merah hanya muncul SETELAH pengguna mencoba menyimpan.
+  const hint = sudahCoba ? cariMasalah() : "";
+
+  const kirim = async () => {
+    if (pratinjauTerkunci) return; // state pratinjau "menyimpan"/"galat": tidak kirim apa pun
+
+    setSudahCoba(true);
+    setGalatServer("");
+    if (cariMasalah()) return;
+
+    try {
+      const hasil = await onSimpan(titik.id, berikutnya, sumber);
+      if (!hasil?.success) {
+        setGalatServer(
+          hasil?.message ||
+            "Perubahan belum dapat disimpan. Periksa koneksi Anda, lalu coba lagi."
+        );
+      }
+    } catch (error) {
+      console.error("Kesalahan saat menyimpan titik air:", error);
+      setGalatServer(
+        error?.message ||
+          "Perubahan belum dapat disimpan. Periksa koneksi Anda, lalu coba lagi."
+      );
+    }
+  };
+
+  // Koordinat: tampil hanya jika keduanya angka yang valid.
   const latitude = Number(titik?.latitude);
   const longitude = Number(titik?.longitude);
-
   const adaKoordinat =
     titik?.latitude !== null &&
     titik?.latitude !== undefined &&
@@ -83,108 +142,85 @@ export default function PanelEditTitikAir({
     ""
   );
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setPesanError("");
-
-    if (!berikutnya.name || !berikutnya.address || !sumber) {
-      setPesanError(
-        "Nama titik air, alamat, dan sumber pembaruan wajib diisi."
-      );
-      return;
-    }
-
-    if (berikutnya.contact.length > 150) {
-      setPesanError("Nama pengelola maksimal 150 karakter.");
-      return;
-    }
-    if (berikutnya.phone && !normalizeIndonesianPhone(berikutnya.phone)) {
-      setPesanError("Nomor telepon pengelola tidak valid. Gunakan nomor Indonesia yang aktif.");
-      return;
-    }
-    if (!berubah) {
-      setPesanError("Belum ada perubahan yang perlu disimpan.");
-      return;
-    }
-
-    try {
-      const hasil = await onSimpan(titik.id, berikutnya, sumber);
-
-      if (!hasil?.success) {
-        setPesanError(
-          hasil?.message || "Perubahan belum berhasil disimpan."
-        );
-      }
-    } catch (error) {
-      console.error("Kesalahan saat menyimpan titik air:", error);
-      setPesanError(
-        error?.message || "Terjadi kesalahan saat menyimpan perubahan."
-      );
-    }
-  };
+  const tampilGalat = galatPratinjau || galatServer;
 
   return (
-    <Overlay
-      onClose={sedangMenyimpan ? () => {} : onClose}
+    <Modal
       title="Edit titik air"
+      onClose={onClose}
+      locked={terkunci}
+      onSubmit={kirim}
+      footer={
+        <>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={menyimpan}
+            className={tombolGhost}
+          >
+            Batal
+          </button>
+          <button type="submit" disabled={menyimpan} className={tombolUtama}>
+            {menyimpan ? "Menyimpan..." : "Simpan Perubahan"}
+          </button>
+        </>
+      }
     >
-      <form className="space-y-5" onSubmit={handleSubmit}>
-        <div>
-          <h3 className="font-heading text-xl font-bold leading-snug text-aira-primary">
-            {titik?.name || "Titik air"}
-          </h3>
-
-          <p className="text-sm text-aira-text/65">
-            {titik?.type || "Jenis belum diketahui"}
-            {titik?.area ? `, ${titik.area}` : ""}
-          </p>
-
-          <div className="mt-3">
-            <VerificationBadge v="Terverifikasi" />
+      {/* Identitas titik air */}
+      <div>
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <h3 className="font-heading text-xl font-bold leading-snug text-aira-primary wrap-break-word">
+              {titik?.name || "Titik air"}
+            </h3>
+            <p className="text-sm text-aira-text/65">
+              {titik?.type || "Jenis belum diketahui"}
+              {titik?.area ? `, ${titik.area}` : ""}
+            </p>
           </div>
+          <VerificationBadge v="Terverifikasi" />
         </div>
 
-        <p className="flex items-center gap-2 text-sm text-aira-text/70">
-          <Clock className="size-4" />
-          Terakhir diperbarui {waktuDiperbarui}
+        <p className="mt-3 flex items-center gap-2 text-base text-aira-text/70">
+          <Clock className="size-4" /> Terakhir diperbarui {waktuDiperbarui}
         </p>
+      </div>
 
-        <dl className="space-y-2 rounded-2xl bg-aira-bg p-4 text-sm">
-          <div>
-            <dt className="font-semibold">Alamat lengkap</dt>
-            <dd className="text-aira-text/80">
-              {titik?.address || "Informasi alamat belum tersedia"}
-            </dd>
-          </div>
+      {/* Ringkasan data yang tidak bisa diubah di sini */}
+      <dl className="space-y-3 rounded-[16px] bg-aira-bg p-4 text-base">
+        <div>
+          <dt className="font-semibold">Alamat lengkap</dt>
+          <dd className="text-aira-text/80">
+            {titik?.address || "Informasi alamat belum tersedia"}
+          </dd>
+        </div>
+        <div>
+          <dt className="font-semibold">Pengelola / kontak</dt>
+          <dd className="text-aira-text/80">
+            {[titik?.provider, titik?.contact].filter(Boolean).join(", ") ||
+              "Belum tersedia"}
+            {titik?.phone ? ` (${titik.phone})` : ""}
+          </dd>
+        </div>
+        <div>
+          <dt className="font-semibold">Koordinat</dt>
+          <dd className="text-aira-text/80">
+            {adaKoordinat
+              ? `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`
+              : "Koordinat belum tersedia"}
+          </dd>
+        </div>
+      </dl>
 
-          <div>
-            <dt className="font-semibold">Pengelola / kontak</dt>
-            <dd className="text-aira-text/80">
-              {[titik?.provider, titik?.contact]
-                .filter(Boolean)
-                .join(", ") || "Belum tersedia"}
-              {titik?.phone ? ` (${titik.phone})` : ""}
-            </dd>
-          </div>
-
-          <div>
-            <dt className="font-semibold">Koordinat</dt>
-            <dd className="text-aira-text/80">
-              {adaKoordinat
-                ? `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`
-                : "Koordinat belum tersedia"}
-            </dd>
-          </div>
-        </dl>
-
+      {/* Form: 2 kolom di layar >= sm */}
+      <div className="grid gap-5 sm:grid-cols-2">
         <Field label="Nama titik air">
           <input
             value={nama}
             onChange={(e) => setNama(e.target.value)}
-            required
             maxLength={200}
-            disabled={sedangMenyimpan}
-            className={inputCls}
+            disabled={menyimpan}
+            className={kolomForm}
           />
         </Field>
 
@@ -192,32 +228,25 @@ export default function PanelEditTitikAir({
           <input
             value={alamat}
             onChange={(e) => setAlamat(e.target.value)}
-            required
             maxLength={500}
-            disabled={sedangMenyimpan}
-            className={inputCls}
+            disabled={menyimpan}
+            className={kolomForm}
           />
         </Field>
 
         <Field label="Ketersediaan air">
-          <div className="grid grid-cols-2 gap-2">
+          <select
+            value={ketersediaan}
+            onChange={(e) => setKetersediaan(e.target.value)}
+            disabled={menyimpan}
+            className={kolomForm}
+          >
             {KETERSEDIAAN.map((k) => (
-              <button
-                type="button"
-                key={k}
-                onClick={() => setKetersediaan(k)}
-                aria-pressed={ketersediaan === k}
-                disabled={sedangMenyimpan}
-                className={`min-h-12 rounded-2xl border-2 px-3 py-3 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
-                  ketersediaan === k
-                    ? "border-aira-primary bg-aira-primary/10 text-aira-primary"
-                    : "border-aira-primary/15 hover:bg-aira-bg"
-                }`}
-              >
+              <option key={k} value={k}>
                 {k}
-              </button>
+              </option>
             ))}
-          </div>
+          </select>
         </Field>
 
         <Field label="Jam operasional">
@@ -225,104 +254,90 @@ export default function PanelEditTitikAir({
             value={jam}
             onChange={(e) => setJam(e.target.value)}
             maxLength={150}
-            disabled={sedangMenyimpan}
-            className={inputCls}
+            disabled={menyimpan}
+            className={kolomForm}
             placeholder="Contoh: Setiap hari, 06.00 - 18.00 WIB"
           />
         </Field>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Nama pengelola">
-            <input
-              value={pengelola}
-              onChange={(e) => setPengelola(e.target.value)}
-              maxLength={150}
-              disabled={sedangMenyimpan}
-              className={inputCls}
-              placeholder="Nama pengelola (opsional)"
-            />
-          </Field>
-          <Field label="Nomor telepon pengelola">
-            <input
-              type="tel"
-              value={telepon}
-              onChange={(e) => setTelepon(e.target.value)}
-              maxLength={24}
-              disabled={sedangMenyimpan}
-              className={inputCls}
-              placeholder="08xxxxxxxxxx"
-            />
-          </Field>
-        </div>
-
-        <Field label="Catatan akses">
-          <textarea
-            value={catatan}
-            onChange={(e) => setCatatan(e.target.value)}
-            rows={3}
-            maxLength={1000}
-            disabled={sedangMenyimpan}
-            className={inputCls}
-            placeholder="Biaya, antrean, atau aturan penggunaan"
+        <Field label="Nama pengelola">
+          <input
+            value={pengelola}
+            onChange={(e) => setPengelola(e.target.value)}
+            maxLength={150}
+            disabled={menyimpan}
+            className={kolomForm}
           />
         </Field>
 
-        <Field
-          label="Sumber pembaruan"
-          hint="Pilih dasar informasi perubahan ini."
-        >
-          <select
-            value={sumber}
-            onChange={(e) => setSumber(e.target.value)}
-            required
-            disabled={sedangMenyimpan}
-            className={inputCls}
-          >
-            <option value="">Pilih sumber</option>
-            {SUMBER_PEMBARUAN.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
+        <Field label="Nomor telepon pengelola">
+          <input
+            type="tel"
+            value={telepon}
+            onChange={(e) => setTelepon(e.target.value)}
+            maxLength={24}
+            disabled={menyimpan}
+            className={kolomForm}
+          />
         </Field>
 
-        {pesanError && (
-          <p
-            role="alert"
-            className="flex gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700"
-          >
-            <AlertCircle className="mt-0.5 size-4 shrink-0" />
-            {pesanError}
-          </p>
-        )}
-
-        <p className="flex gap-2 rounded-2xl bg-aira-sand p-4 text-sm leading-relaxed">
-          <Info className="mt-0.5 size-4 shrink-0 text-aira-primary" />
-          Waktu pembaruan dan sumber informasi perlu dicatat agar perubahan
-          dapat ditelusuri. Pastikan informasi ketersediaan sesuai dengan
-          kondisi atau sumber yang dapat dipertanggungjawabkan.
-        </p>
-
-        <div className="flex flex-col gap-3 sm:flex-row">
-          <button
-            type="submit"
-            disabled={!bisaSimpan}
-            className="min-h-13 w-full rounded-full bg-aira-primary px-8 py-3.5 font-semibold text-white shadow-soft transition-colors hover:bg-aira-primary-dark disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-aira-primary sm:w-auto"
-          >
-            {sedangMenyimpan ? "Menyimpan..." : "Simpan Perubahan"}
-          </button>
-
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={sedangMenyimpan}
-            className="min-h-13 w-full rounded-full px-6 py-3.5 font-semibold text-aira-primary hover:bg-aira-primary/10 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
-          >
-            Batal
-          </button>
+        <div className="sm:col-span-2">
+          <Field label="Catatan akses">
+            <textarea
+              value={catatan}
+              onChange={(e) => setCatatan(e.target.value)}
+              rows={3}
+              maxLength={1000}
+              disabled={menyimpan}
+              className={kolomForm}
+              placeholder="Biaya, antrean, atau aturan penggunaan"
+            />
+          </Field>
         </div>
-      </form>
-    </Overlay>
+
+        <div className="sm:col-span-2">
+          <Field
+            label="Sumber pembaruan"
+            hint="Pilih dasar informasi perubahan ini."
+          >
+            <select
+              value={sumber}
+              onChange={(e) => setSumber(e.target.value)}
+              disabled={menyimpan}
+              className={`${kolomForm} ${
+                sudahCoba && !sumber ? kolomSalah : ""
+              }`}
+            >
+              <option value="">Pilih sumber</option>
+              {SUMBER_PEMBARUAN.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          </Field>
+        </div>
+      </div>
+
+      <p className="flex gap-3 rounded-[16px] bg-aira-sand p-4 text-base leading-relaxed">
+        <Info className="mt-0.5 size-5 shrink-0 text-aira-primary" />
+        Waktu pembaruan dan sumber informasi perlu dicatat agar perubahan dapat
+        ditelusuri. Pastikan informasi ketersediaan sesuai dengan kondisi atau
+        sumber yang dapat dipertanggungjawabkan.
+      </p>
+
+      {hint && (
+        <p role="alert" className="text-base font-medium text-[#c0392b]">
+          {hint}
+        </p>
+      )}
+
+      {tampilGalat && (
+        <Alert>
+          {galatServer ||
+            "Perubahan belum dapat disimpan. Periksa koneksi Anda, lalu coba lagi."}
+        </Alert>
+      )}
+    </Modal>
   );
 }
