@@ -18,7 +18,7 @@ export default function DashboardPageHeader({
       </div>
 
       {action && (
-        <div className="shrink-0">
+        <div className="shrink-0 sm:mt-8">
           {action}
         </div>
       )}
