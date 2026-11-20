@@ -1,9 +1,11 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Calculator, Trash2 } from "lucide-react";
 
+import { BATAS_CATATAN, DialogCatatan, DialogKonfirmasi } from "@/components/dashboard/kondisi-air/DialogDashboard";
 import { simpanDraftKalkulator } from "@/lib/hasilKalkulator";
 import { formatDesimal } from "@/lib/statusDashboard";
 
@@ -18,44 +20,91 @@ const teksMasukan = (r) =>
 
 const labelStatus = (status) => status.tampilan.label.split(" / ")[0];
 
+// Tombol aksi pada baris riwayat (ukuran sama, tersusun vertikal di tabel).
+const tombolBaris =
+  "h-9 w-[128px] rounded-full border-[1.5px] px-4 text-sm font-semibold transition-colors disabled:opacity-50";
+const tombolBarisGaris = `${tombolBaris} border-aira-primary/40 text-aira-primary hover:bg-aira-primary/10`;
+const tombolBarisHapus = `${tombolBaris} inline-flex items-center justify-center gap-1.5 border-aira-peach text-[#8a3a22] hover:bg-aira-peach/25`;
+
 // `riwayat`: [{ ...catatan perhitungan, tanggalPenuh, status }] (status = hasil hitungStatusDashboard).
 // `baru` = User Baru (belum ada catatan): hanya judul dan keterangan, tanpa kotak kosong.
 export default function RiwayatPerhitungan({ riwayat, baru = false }) {
   const router = useRouter();
+  const [catatanUntuk, setCatatanUntuk] = useState(null);
+  const [hapusUntuk, setHapusUntuk] = useState(null);
+  const [memuat, setMemuat] = useState(false);
+  const [galat, setGalat] = useState("");
+  const [toast, setToast] = useState("");
 
-  // "Hitung ulang": isi draft Kalkulator dengan data perhitungan ini, lalu buka Kalkulator.
-  async function ubahCatatan(r) {
-    const nilai = window.prompt("Catatan asesmen (maksimal 2.000 karakter):", r.catatanAsesmen || "");
-    if (nilai === null) return;
-    if (nilai.length > 2000) {
-      window.alert("Catatan maksimal 2.000 karakter.");
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(""), 2800);
+    return () => clearTimeout(t);
+  }, [toast]);
+
+  function bukaCatatan(r) {
+    setGalat("");
+    setCatatanUntuk(r);
+  }
+
+  function bukaHapus(r) {
+    setGalat("");
+    setHapusUntuk(r);
+  }
+
+  function tutupDialog() {
+    if (memuat) return;
+    setCatatanUntuk(null);
+    setHapusUntuk(null);
+    setGalat("");
+  }
+
+  async function simpanCatatan(nilai) {
+    if (!catatanUntuk || memuat) return;
+    if (nilai.length > BATAS_CATATAN) {
+      setGalat("Catatan maksimal 2.000 karakter.");
       return;
     }
-    const response = await fetch(`/api/water-assessments/${r.id}`, {
+    setGalat("");
+    setMemuat(true);
+    const response = await fetch(`/api/water-assessments/${catatanUntuk.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ assessment_notes: nilai }),
-    });
-    const result = await response.json().catch(() => null);
-    if (!response.ok || !result?.success) {
-      window.alert(result?.message || "Catatan asesmen belum dapat diperbarui.");
+    }).catch(() => null);
+    const result = await response?.json().catch(() => null);
+    setMemuat(false);
+    if (!response?.ok || !result?.success) {
+      setGalat(result?.message || "Catatan asesmen belum dapat diperbarui.");
       return;
     }
+    setCatatanUntuk(null);
+    setToast("Catatan tersimpan");
     router.refresh();
   }
 
-  async function hapusRiwayat(r) {
-    const yakin = window.confirm("Hapus riwayat perhitungan ini secara permanen? Rekomendasi dan interaksi Assistant yang terhubung langsung ke asesmen ini juga akan dihapus. Data profil keluarga tidak akan dihapus.");
-    if (!yakin) return;
-    const response = await fetch(`/api/water-assessments/${r.id}`, { method: "DELETE" });
-    const result = await response.json().catch(() => null);
-    if (!response.ok || !result?.success) {
-      window.alert(result?.message || "Riwayat belum dapat dihapus. Coba muat ulang halaman atau hubungi pengelola jika masalah berlanjut.");
+  async function hapusRiwayat() {
+    if (!hapusUntuk || memuat) return;
+    setGalat("");
+    setMemuat(true);
+    const response = await fetch(`/api/water-assessments/${hapusUntuk.id}`, {
+      method: "DELETE",
+    }).catch(() => null);
+    const result = await response?.json().catch(() => null);
+    setMemuat(false);
+    if (!response?.ok || !result?.success) {
+      setGalat(
+        result?.message ||
+          "Riwayat belum dapat dihapus. Coba muat ulang halaman atau hubungi pengelola jika masalah berlanjut.",
+      );
       return;
     }
+    setHapusUntuk(null);
+    setToast("Riwayat perhitungan dihapus");
     router.refresh();
   }
 
+  // "Hitung ulang": isi draft Kalkulator dengan data perhitungan ini, lalu buka Kalkulator.
   function hitungUlang(r) {
     const persen = Math.min(100, Math.round((r.liter / r.kapasitasTandonLiter) * 20) * 5);
 
@@ -75,12 +124,21 @@ export default function RiwayatPerhitungan({ riwayat, baru = false }) {
 
   return (
     <section className="min-w-0 overflow-hidden rounded-[28px] border border-aira-primary/5 bg-white p-6 shadow-soft sm:p-8">
-      <h2 className="text-xl font-semibold text-aira-primary">Riwayat perhitungan</h2>
-      <p className="mt-1 text-sm text-aira-text/70">
+      <h2 className="text-[22px] font-semibold text-aira-primary">Riwayat perhitungan</h2>
+      <p className="mt-1 text-base text-aira-text/70">
         {baru
           ? "Belum ada riwayat pengisian kalkulator"
           : 'Pilih "Hitung ulang" untuk membuka kalkulator dengan data yang sudah terisi.'}
       </p>
+
+      {toast && (
+        <p
+          role="status"
+          className="fixed bottom-6 left-1/2 z-[1100] -translate-x-1/2 rounded-full bg-aira-primary-dark px-6 py-3 text-base font-medium text-white shadow-soft"
+        >
+          {toast}
+        </p>
+      )}
 
       {baru ? null : riwayat.length === 0 ? (
         <div className="mt-5 rounded-2xl bg-aira-bg p-8 text-center">
@@ -94,90 +152,73 @@ export default function RiwayatPerhitungan({ riwayat, baru = false }) {
         </div>
       ) : (
         <>
-          <div className="mt-4 hidden rounded-2xl border border-aira-primary/10 lg:block">
-            <table
-              className="w-full table-fixed text-left text-[13px]"
-              aria-label="Riwayat perhitungan ketahanan air"
-            >
+          <div className="mt-5 hidden overflow-hidden rounded-2xl border border-aira-primary/10 lg:block">
+            <table className="w-full table-fixed text-left text-[15px]" aria-label="Riwayat perhitungan ketahanan air">
               <caption className="sr-only">Riwayat data dan hasil perhitungan ketahanan air rumah tangga</caption>
               <colgroup>
-                <col className="w-[12%]" />
-                <col className="w-[16%]" />
-                <col className="w-[20%]" />
-                <col className="w-[12%]" />
                 <col className="w-[11%]" />
-                <col className="w-[12%]" />
-                <col className="w-[17%]" />
+                <col className="w-[18%]" />
+                <col className="w-[19%]" />
+                <col className="w-[11%]" />
+                <col className="w-[11%]" />
+                <col className="w-[10%]" />
+                <col className="w-[160px]" />
               </colgroup>
               <thead>
-                <tr className="border-b border-aira-primary/10 bg-aira-bg align-bottom text-[11px] uppercase tracking-wide text-aira-text/60">
-                  <th className="px-2.5 py-3 font-semibold">Tanggal</th>
-                  <th className="px-2.5 py-3 font-semibold">Lokasi</th>
-                  <th className="px-2.5 py-3 font-semibold">Masukan</th>
-                  <th className="px-2.5 py-3 font-semibold">Volume</th>
-                  <th className="px-2.5 py-3 font-semibold">Ketahanan</th>
-                  <th className="px-2.5 py-3 font-semibold">Status</th>
-                  <th className="px-2.5 py-3 font-semibold">
+                <tr className="border-b border-aira-primary/10 bg-aira-text/5 align-bottom text-xs uppercase tracking-wider text-aira-text/60">
+                  {["Tanggal", "Lokasi", "Masukan", "Volume", "Ketahanan", "Status"].map((h) => (
+                    <th key={h} className="px-3 py-3.5 font-semibold">
+                      {h}
+                    </th>
+                  ))}
+                  <th className="px-3 py-3.5">
                     <span className="sr-only">Aksi</span>
                   </th>
                 </tr>
               </thead>
               <tbody>
                 {riwayat.map((r) => (
-                  <tr
-                    key={r.id}
-                    className="border-b border-aira-primary/5 last:border-0 odd:bg-white even:bg-aira-bg/60 hover:bg-aira-sage/10"
-                  >
-                    <td className="px-2.5 py-3.5 align-middle">
-                      <span className="font-medium">{r.tanggalPenuh}</span>
-                      {r.waktu && <span className="block text-xs text-aira-text/60">{r.waktu}</span>}
+                  <tr key={r.id} className="border-b border-aira-primary/5 last:border-0 hover:bg-aira-sage/10">
+                    <td className="px-3 py-5 align-top">
+                      <span className="font-semibold">{r.tanggalPenuh}</span>
+                      {r.waktu && <span className="block text-sm text-aira-text/60">{r.waktu}</span>}
                     </td>
-                    <td className="break-words px-2.5 py-3.5 align-middle">
+                    <td className="break-words px-3 py-5 align-top">
                       {r.lokasi || <span className="text-aira-text/50">Tidak diisi</span>}
-                      <span className="block text-xs text-aira-text/60">
+                      <span className="block text-sm text-aira-text/60">
                         Sumber: {kondisiTampilan(r.kondisiSumberAir)}
                       </span>
                     </td>
-                    <td className="break-words px-2.5 py-3.5 align-middle text-xs text-aira-text/80">
-                      {teksMasukan(r)}
-                    </td>
-                    <td className="whitespace-nowrap px-2.5 py-3.5 align-middle">
+                    <td className="break-words px-3 py-5 align-top text-aira-text/80">{teksMasukan(r)}</td>
+                    <td className="whitespace-nowrap px-3 py-5 align-top">
                       {formatLiter(r.liter)} L
-                      <span className="block text-xs text-aira-text/60">{r.status.kebutuhanHarian} L/hari</span>
+                      <span className="block text-sm text-aira-text/60">{r.status.kebutuhanHarian} L/hari</span>
                     </td>
-                    <td className="whitespace-nowrap px-2.5 py-3.5 align-middle font-semibold text-aira-primary">
+                    <td className="whitespace-nowrap px-3 py-5 align-top font-semibold text-aira-primary">
                       {formatDesimal(r.status.hari)} hari
                     </td>
-                    <td className="px-2.5 py-3.5 align-middle">
+                    <td className="px-3 py-5 align-top">
                       <span
-                        className={`inline-flex items-center justify-center rounded-full px-2.5 py-1 text-center text-xs font-semibold ${r.status.tampilan.chip}`}
+                        className={`inline-flex rounded-full px-3 py-1 text-sm font-semibold ${r.status.tampilan.chip}`}
                       >
                         {labelStatus(r.status)}
                       </span>
                     </td>
-                    <td className="px-2.5 py-3.5 text-right align-middle">
-                      <div className="flex flex-wrap justify-end gap-2">
-                        <button
-                          type="button"
-                          onClick={() => ubahCatatan(r)}
-                          className="min-h-[36px] whitespace-nowrap rounded-full border border-aira-primary/20 px-3 py-1.5 text-xs font-semibold text-aira-primary hover:bg-aira-primary/10"
-                        >
+                    <td className="px-3 py-5 align-top">
+                      <div className="flex flex-col items-end gap-2">
+                        <button type="button" onClick={() => bukaCatatan(r)} className={tombolBarisGaris}>
                           Catatan
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => hitungUlang(r)}
-                          className="min-h-[36px] whitespace-nowrap rounded-full border border-aira-primary/30 px-3 py-1.5 text-xs font-semibold text-aira-primary hover:bg-aira-primary/10"
-                        >
+                        <button type="button" onClick={() => hitungUlang(r)} className={tombolBarisGaris}>
                           Hitung ulang
                         </button>
                         <button
                           type="button"
-                          onClick={() => hapusRiwayat(r)}
+                          onClick={() => bukaHapus(r)}
                           aria-label={`Hapus riwayat ${r.tanggalPenuh}`}
-                          className="inline-flex min-h-[36px] items-center gap-1 whitespace-nowrap rounded-full border border-aira-danger-text/30 px-3 py-1.5 text-xs font-semibold text-aira-danger-text hover:bg-aira-peach/20"
+                          className={tombolBarisHapus}
                         >
-                          <Trash2 className="size-3.5" /> Hapus
+                          <Trash2 className="size-4" /> Hapus
                         </button>
                       </div>
                     </td>
@@ -187,27 +228,27 @@ export default function RiwayatPerhitungan({ riwayat, baru = false }) {
             </table>
           </div>
 
-          <ul className="mt-4 space-y-3 lg:hidden" aria-label="Riwayat perhitungan ketahanan air">
+          <ul className="mt-5 space-y-3 lg:hidden" aria-label="Riwayat perhitungan ketahanan air">
             {riwayat.map((r) => (
               <li key={r.id} className="rounded-2xl border border-aira-primary/10 bg-aira-bg/40 p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="font-semibold">{r.tanggalPenuh}</p>
-                    {r.waktu && <p className="text-xs text-aira-text/60">{r.waktu}</p>}
+                    {r.waktu && <p className="text-sm text-aira-text/60">{r.waktu}</p>}
                   </div>
                   <span
-                    className={`inline-flex shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${r.status.tampilan.chip}`}
+                    className={`inline-flex shrink-0 rounded-full px-3 py-1 text-sm font-semibold ${r.status.tampilan.chip}`}
                   >
                     {labelStatus(r.status)}
                   </span>
                 </div>
 
-                <dl className="mt-3 space-y-2 text-sm">
+                <dl className="mt-3 space-y-2 text-[15px]">
                   <div className="grid grid-cols-[110px_1fr] gap-2">
                     <dt className="text-aira-text/60">Lokasi</dt>
                     <dd>
                       {r.lokasi || <span className="text-aira-text/50">Tidak diisi</span>}
-                      <span className="block text-xs text-aira-text/60">
+                      <span className="block text-sm text-aira-text/60">
                         Sumber: {kondisiTampilan(r.kondisiSumberAir)}
                       </span>
                     </dd>
@@ -217,7 +258,7 @@ export default function RiwayatPerhitungan({ riwayat, baru = false }) {
                     <dd>{teksMasukan(r)}</dd>
                   </div>
                   <div className="grid grid-cols-[110px_1fr] gap-2">
-                    <dt className="text-aira-text/60">Volume dan kebutuhan</dt>
+                    <dt className="text-aira-text/60">Volume</dt>
                     <dd>
                       {formatLiter(r.liter)} L · {r.status.kebutuhanHarian} L/hari
                     </dd>
@@ -228,26 +269,26 @@ export default function RiwayatPerhitungan({ riwayat, baru = false }) {
                   </div>
                 </dl>
 
-                <div className="mt-4 flex flex-wrap gap-2">
+                <div className="mt-4 flex gap-2">
                   <button
                     type="button"
-                    onClick={() => ubahCatatan(r)}
-                    className="min-h-[44px] rounded-full border border-aira-primary/20 px-4 py-2.5 text-sm font-semibold text-aira-primary hover:bg-aira-primary/10"
+                    onClick={() => bukaCatatan(r)}
+                    className="h-10 flex-1 rounded-full border-[1.5px] border-aira-primary/40 text-sm font-semibold text-aira-primary hover:bg-aira-primary/10"
                   >
                     Catatan
                   </button>
                   <button
                     type="button"
                     onClick={() => hitungUlang(r)}
-                    className="min-h-[44px] flex-1 rounded-full border border-aira-primary/30 px-4 py-2.5 text-sm font-semibold text-aira-primary hover:bg-aira-primary/10"
+                    className="h-10 flex-1 rounded-full border-[1.5px] border-aira-primary/40 text-sm font-semibold text-aira-primary hover:bg-aira-primary/10"
                   >
                     Hitung ulang
                   </button>
                   <button
                     type="button"
-                    onClick={() => hapusRiwayat(r)}
+                    onClick={() => bukaHapus(r)}
                     aria-label={`Hapus riwayat ${r.tanggalPenuh}`}
-                    className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full border border-aira-danger-text/30 px-4 py-2.5 text-sm font-semibold text-aira-danger-text hover:bg-aira-peach/20"
+                    className="inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-full border-[1.5px] border-aira-peach text-sm font-semibold text-[#8a3a22] hover:bg-aira-peach/25"
                   >
                     <Trash2 className="size-4" /> Hapus
                   </button>
@@ -256,6 +297,27 @@ export default function RiwayatPerhitungan({ riwayat, baru = false }) {
             ))}
           </ul>
         </>
+      )}
+
+      {catatanUntuk && (
+        <DialogCatatan
+          key={catatanUntuk.id}
+          awal={catatanUntuk.catatanAsesmen || ""}
+          memuat={memuat}
+          galat={galat}
+          onBatal={tutupDialog}
+          onSimpan={simpanCatatan}
+        />
+      )}
+      {hapusUntuk && (
+        <DialogKonfirmasi
+          judul="Hapus riwayat perhitungan?"
+          isi="Hapus riwayat perhitungan ini secara permanen? Rekomendasi dan interaksi Assistant yang terhubung langsung ke asesmen ini juga akan dihapus. Data profil keluarga tidak akan dihapus."
+          memuat={memuat}
+          galat={galat}
+          onBatal={tutupDialog}
+          onKonfirmasi={hapusRiwayat}
+        />
       )}
     </section>
   );

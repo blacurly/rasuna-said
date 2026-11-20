@@ -6,11 +6,14 @@ import { Trash2 } from "lucide-react";
 import { CheckCircle2 } from "lucide-react";
 
 import { Field, Toggle, inputCls } from "@/components/dashboard/DashboardFormUi";
+import { DialogKonfirmasi } from "@/components/dashboard/kondisi-air/DialogDashboard";
 import { simpanProfilKeluarga } from "@/app/actions/dashboard";
 import { SUMBER_AIR_PROFIL } from "@/lib/sumberAir";
 
 // Formulir Profil keluarga. `awal` = nilai awal dari data keluarga (database).
 // `kosong` = belum ada profil tersimpan (User Baru): kolom kosong dengan placeholder.
+const campur = `${inputCls} !min-h-[56px] text-base`;
+
 export default function ProfilKeluargaForm({ awal, kosong = false }) {
   const router = useRouter();
   const [mhm, setMhm] = useState(awal.anggotaMhm > 0);
@@ -19,21 +22,31 @@ export default function ProfilKeluargaForm({ awal, kosong = false }) {
   const [tersimpan, setTersimpan] = useState(false);
   const [galat, setGalat] = useState("");
   const [menyimpan, setMenyimpan] = useState(false);
+  const [dialogHapus, setDialogHapus] = useState(false);
+  const [menghapus, setMenghapus] = useState(false);
+  const [galatHapus, setGalatHapus] = useState("");
 
   async function hapusProfil() {
-    if (!awal.householdId) return;
-    const yakin = window.confirm("Hapus profil rumah tangga? Penghapusan hanya dapat dilakukan jika belum ada anggota, riwayat asesmen, atau interaksi Assistant yang terhubung.");
-    if (!yakin) return;
-    setGalat("");
-    setMenyimpan(true);
-    const response = await fetch(`/api/households/${awal.householdId}`, { method: "DELETE" });
-    const result = await response.json().catch(() => null);
-    setMenyimpan(false);
-    if (!response.ok || !result?.success) {
-      setGalat(result?.message || "Profil keluarga belum dapat dihapus.");
+    if (!awal.householdId || menghapus) return;
+    setGalatHapus("");
+    setMenghapus(true);
+    const response = await fetch(`/api/households/${awal.householdId}`, {
+      method: "DELETE",
+    }).catch(() => null);
+    const result = await response?.json().catch(() => null);
+    setMenghapus(false);
+    if (!response?.ok || !result?.success) {
+      setGalatHapus(result?.message || "Profil keluarga belum dapat dihapus.");
       return;
     }
+    setDialogHapus(false);
     router.refresh();
+  }
+
+  function tutupDialogHapus() {
+    if (menghapus) return;
+    setDialogHapus(false);
+    setGalatHapus("");
   }
 
   async function simpan(e) {
@@ -85,134 +98,154 @@ export default function ProfilKeluargaForm({ awal, kosong = false }) {
   }
 
   return (
-    <form
-      className="space-y-5 rounded-[28px] border border-aira-primary/5 bg-white p-6 shadow-soft sm:p-8"
-      onSubmit={simpan}
-      onChange={() => {
-        setTersimpan(false);
-        setGalat("");
-      }}
-    >
-      <h2 className="text-xl font-semibold text-aira-primary">Profil keluarga</h2>
+    <>
+      <form
+        className="space-y-5 rounded-[28px] border border-aira-primary/5 bg-white p-6 shadow-soft sm:p-8"
+        onSubmit={simpan}
+        onChange={() => {
+          setTersimpan(false);
+          setGalat("");
+        }}
+      >
+        <h2 className="text-[22px] font-semibold text-aira-primary">Profil keluarga</h2>
 
-      <div className="grid gap-5 sm:grid-cols-2">
-        <Field label="Nama rumah tangga">
-          <input
-            name="household"
-            required
-            defaultValue={awal.namaRumahTangga}
-            placeholder="Contoh: Keluarga Siti Rahma"
-            className={inputCls}
-          />
-        </Field>
-        <Field label="Desa / kelurahan dan kecamatan">
-          <input
-            name="area"
-            required
-            defaultValue={awal.wilayahDesa}
-            placeholder="Contoh: Desa Bohol, Kec. Rongkop"
-            className={inputCls}
-          />
-        </Field>
-        <Field label="Jumlah anggota keluarga" hint="Isi jumlah orang yang tinggal dalam rumah tangga.">
-          <input
-            name="members"
-            type="number"
-            min={1}
-            required
-            defaultValue={awal.anggota ?? ""}
-            placeholder="Contoh: 4"
-            className={inputCls}
-          />
-        </Field>
-        <Field
-          label="Perempuan usia subur"
-          hint={mhm || kosong ? "Opsional; digunakan bila kebutuhan MHM disertakan." : "Aktifkan kebutuhan MHM untuk mengisi"}
-        >
-          <input
-            name="women"
-            type="number"
-            min={0}
-            value={mhm ? perempuan : kosong ? "" : "0"}
-            placeholder="Contoh: 2"
-            disabled={!mhm}
-            onChange={(e) => setPerempuan(e.target.value)}
-            className={`${inputCls} ${mhm ? "" : "cursor-not-allowed bg-aira-sand/60 text-aira-text/50"}`}
-          />
-        </Field>
-        <Field label="Sumber air utama">
-          <select
-            name="source"
-            required
-            value={sumber}
-            onChange={(e) => setSumber(e.target.value)}
-            className={`${inputCls} ${sumber === "" ? "text-aira-text/50" : ""}`}
+        <div className="grid gap-6 sm:grid-cols-2">
+          <Field label="Nama rumah tangga">
+            <input
+              name="household"
+              required
+              defaultValue={awal.namaRumahTangga}
+              placeholder="Contoh: Keluarga Siti Rahma"
+              className={campur}
+            />
+          </Field>
+          <Field label="Desa / kelurahan dan kecamatan">
+            <input
+              name="area"
+              required
+              defaultValue={awal.wilayahDesa}
+              placeholder="Contoh: Desa Bohol, Kec. Rongkop"
+              className={campur}
+            />
+          </Field>
+          <Field label="Jumlah anggota keluarga" hint="Isi jumlah orang yang tinggal dalam rumah tangga.">
+            <input
+              name="members"
+              type="number"
+              min={1}
+              required
+              defaultValue={awal.anggota ?? ""}
+              placeholder="Contoh: 4"
+              className={campur}
+            />
+          </Field>
+          <Field
+            label="Perempuan usia subur"
+            hint={
+              mhm || kosong
+                ? "Opsional; digunakan bila kebutuhan MHM disertakan."
+                : "Aktifkan kebutuhan MHM untuk mengisi"
+            }
           >
-            {kosong && (
-              <option value="" disabled>
-                Pilih sumber air
-              </option>
-            )}
-            {SUMBER_AIR_PROFIL.map((s) => (
-              <option key={s} className="text-aira-text">
-                {s}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Kapasitas tandon (liter)" hint="Isi 0 bila rumah tangga tidak menggunakan tandon.">
-          <input
-            name="capacity"
-            type="number"
-            min={0}
-            defaultValue={awal.kapasitasTandonLiter}
-            placeholder="Contoh: 1000"
-            className={inputCls}
-          />
-        </Field>
-      </div>
-
-      <div className="flex items-center gap-4 rounded-2xl bg-aira-warm p-5">
-        <div className="flex-1">
-          <p className="text-[15px] font-semibold leading-normal">Sertakan kebutuhan MHM</p>
-          <p className="mt-1 text-sm text-aira-text/70">Menambah 5 liter per orang per hari pada perhitungan.</p>
+            <input
+              name="women"
+              type="number"
+              min={0}
+              value={mhm ? perempuan : kosong ? "" : "0"}
+              placeholder="Contoh: 2"
+              disabled={!mhm}
+              onChange={(e) => setPerempuan(e.target.value)}
+              className={`${campur} ${mhm ? "" : "cursor-not-allowed bg-aira-sand/60 text-aira-text/50"}`}
+            />
+          </Field>
+          <Field label="Sumber air utama">
+            <select
+              name="source"
+              required
+              value={sumber}
+              onChange={(e) => setSumber(e.target.value)}
+              className={`${campur} ${sumber === "" ? "text-aira-text/50" : ""}`}
+            >
+              {kosong && (
+                <option value="" disabled>
+                  Pilih sumber air
+                </option>
+              )}
+              {SUMBER_AIR_PROFIL.map((s) => (
+                <option key={s} className="text-aira-text">
+                  {s}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Kapasitas tandon (liter)" hint="Isi 0 bila rumah tangga tidak menggunakan tandon.">
+            <input
+              name="capacity"
+              type="number"
+              min={0}
+              defaultValue={awal.kapasitasTandonLiter}
+              placeholder="Contoh: 1000"
+              className={campur}
+            />
+          </Field>
         </div>
-        <Toggle on={mhm} onChange={setMhm} label="Sertakan kebutuhan MHM" />
-      </div>
 
-      <div className="flex flex-wrap items-center gap-4">
-        <button
-          type="submit"
-          disabled={menyimpan}
-          className="min-h-[52px] w-full rounded-full bg-aira-primary px-8 py-3.5 font-semibold text-white shadow-soft transition-colors hover:bg-aira-primary-dark disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
-        >
-          {menyimpan ? "Menyimpan..." : "Simpan Profil"}
-        </button>
-        {tersimpan && (
-          <span className="inline-flex items-center gap-2 font-medium text-aira-primary" role="status">
-            <CheckCircle2 className="size-5" /> Profil keluarga tersimpan
-          </span>
-        )}
-        {awal.householdId && (
+        <div className="flex items-center gap-4 rounded-2xl bg-aira-warm p-5">
+          <div className="flex-1">
+            <p className="text-[15px] font-semibold leading-normal">Sertakan kebutuhan MHM</p>
+            <p className="mt-1 text-sm text-aira-text/70">Menambah 5 liter per orang per hari pada perhitungan.</p>
+          </div>
+          <Toggle on={mhm} onChange={setMhm} label="Sertakan kebutuhan MHM" />
+        </div>
+
+        <div className="flex flex-wrap items-center gap-4">
           <button
-            type="button"
-            onClick={hapusProfil}
+            type="submit"
             disabled={menyimpan}
-            className="inline-flex min-h-[44px] items-center gap-2 rounded-full border border-aira-danger-text/30 px-5 py-2.5 text-sm font-semibold text-aira-danger-text transition-colors hover:bg-aira-peach/20 disabled:opacity-60"
+            className="min-h-[52px] w-full rounded-full bg-aira-primary px-8 py-3.5 font-semibold text-white shadow-soft transition-colors hover:bg-aira-primary-dark disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
           >
-            <Trash2 className="size-4" /> Hapus profil
+            {menyimpan ? "Menyimpan..." : "Simpan Profil"}
           </button>
-        )}
-        {galat && (
-          <span className="text-sm font-medium text-aira-danger-dark" role="alert">
-            {galat}
-          </span>
-        )}
-      </div>
+          {tersimpan && (
+            <span className="inline-flex items-center gap-2 font-medium text-aira-primary" role="status">
+              <CheckCircle2 className="size-5" /> Profil keluarga tersimpan
+            </span>
+          )}
+          {awal.householdId && (
+            <button
+              type="button"
+              onClick={() => {
+                setGalatHapus("");
+                setDialogHapus(true);
+              }}
+              disabled={menyimpan}
+              className="inline-flex min-h-[52px] w-full items-center justify-center gap-2 rounded-full border-2 border-aira-peach px-6 text-base font-semibold text-[#8a3a22] transition-colors hover:bg-aira-peach/25 disabled:opacity-60 sm:w-auto"
+            >
+              <Trash2 className="size-4" /> Hapus profil
+            </button>
+          )}
+          {galat && (
+            <span className="text-sm font-medium text-aira-danger-dark" role="alert">
+              {galat}
+            </span>
+          )}
+        </div>
 
-      <p className="text-xs text-aira-text/60">
-        Perubahan profil tidak mengubah hasil perhitungan yang sudah tersimpan dalam riwayat.
-      </p>
-    </form>
+        <p className="text-sm text-aira-text/65">
+          Perubahan profil tidak mengubah hasil perhitungan yang sudah tersimpan dalam riwayat.
+        </p>
+      </form>
+
+      {dialogHapus && (
+        <DialogKonfirmasi
+          judul="Hapus profil rumah tangga?"
+          isi="Hapus profil rumah tangga? Penghapusan hanya dapat dilakukan jika belum ada anggota, riwayat asesmen, atau interaksi Assistant yang terhubung."
+          memuat={menghapus}
+          galat={galatHapus}
+          onBatal={tutupDialogHapus}
+          onKonfirmasi={hapusProfil}
+        />
+      )}
+    </>
   );
 }
