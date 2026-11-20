@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useMemo, useState } from "react";
@@ -33,8 +34,8 @@ import {
   simpanTitikAirAction as simpanBawaan,
 } from "@/app/actions/admin-titik-air";
 
-// Baris "Pratinjau:" (tombol-tombol state) ikut tampil di desain Figma Make.
-// Itu alat bantu desain. Ubah menjadi false untuk menyembunyikannya saat rilis.
+// Baris pratinjau merupakan alat bantu desain Figma Make.
+// Ubah menjadi false untuk menyembunyikannya saat rilis.
 const TAMPILKAN_PRATINJAU = true;
 
 const PRATINJAU = [
@@ -48,47 +49,62 @@ const PRATINJAU = [
   { id: "delete-loading", label: "Hapus memuat" },
 ];
 
-const tunggu = (ms) => new Promise((selesai) => setTimeout(selesai, ms));
+const tunggu = (ms) =>
+  new Promise((selesai) => setTimeout(selesai, ms));
 
 export default function KelolaTitikAir({
   awal = [],
-  simpanTitikAirAction, // opsional: kalau tidak diberikan, memakai action bawaan
+  simpanTitikAirAction,
 }) {
-  const [titik, setTitik] = useState(Array.isArray(awal) ? awal : []);
+  const [titik, setTitik] = useState(
+    Array.isArray(awal) ? awal : []
+  );
 
   const [kataKunci, setKataKunci] = useState("");
   const [filter, setFilter] = useState("Semua");
 
-  // Modal mana yang sedang terbuka
+  // Modal yang sedang terbuka
   const [editId, setEditId] = useState(null);
   const [tambahTerbuka, setTambahTerbuka] = useState(false);
   const [hapusId, setHapusId] = useState(null);
 
-  // Status proses ASLI (bukan pratinjau)
+  // Status proses sebenarnya
   const [sedangMenyimpan, setSedangMenyimpan] = useState(false);
   const [sedangMenghapus, setSedangMenghapus] = useState(false);
   const [galatHapus, setGalatHapus] = useState("");
 
-  const [pesan, setPesan] = useState(""); // pesan sukses (Toast)
-  const [pratinjau, setPratinjau] = useState(""); // state pratinjau aktif, "" = mode normal
-  const [kunciForm, setKunciForm] = useState(0); // dinaikkan agar modal dibuat ulang dari awal
+  const [pesan, setPesan] = useState("");
+  const [pratinjau, setPratinjau] = useState("");
+  const [kunciForm, setKunciForm] = useState(0);
 
-  // Tampilan "sedang memproses" = proses asli ATAU state pratinjau.
-  const menyimpanTampil = sedangMenyimpan || pratinjau === "edit-saving";
-  const menghapusTampil = sedangMenghapus || pratinjau === "delete-loading";
+  // Status loading untuk tampilan normal maupun pratinjau
+  const menyimpanTampil =
+    sedangMenyimpan || pratinjau === "edit-saving";
 
-  const itemEdit = titik.find((t) => t.id === editId) ?? null;
-  const itemHapus = titik.find((t) => t.id === hapusId) ?? null;
+  const menghapusTampil =
+    sedangMenghapus || pratinjau === "delete-loading";
 
-  // Daftar yang tampil setelah pencarian + filter ketersediaan.
+  const itemEdit =
+    titik.find((t) => t.id === editId) ?? null;
+
+  const itemHapus =
+    titik.find((t) => t.id === hapusId) ?? null;
+
+  // Daftar setelah pencarian dan filter
   const daftar = useMemo(() => {
     const kunci = kataKunci.trim().toLowerCase();
 
     return titik.filter((t) => {
       const cocokFilter =
-        filter === "Semua" || formatAvailability(t.availability) === filter;
+        filter === "Semua" ||
+        formatAvailability(t.availability) === filter;
 
-      const teksCari = [t.name, t.area, t.type, t.address]
+      const teksCari = [
+        t.name,
+        t.area,
+        t.type,
+        t.address,
+      ]
         .filter(Boolean)
         .join(" ")
         .toLowerCase();
@@ -97,7 +113,7 @@ export default function KelolaTitikAir({
     });
   }, [titik, filter, kataKunci]);
 
-  // ---------- Membuka / menutup modal ----------
+  // ---------- Membuka dan menutup modal ----------
 
   const tutupSemua = () => {
     setEditId(null);
@@ -132,6 +148,7 @@ export default function KelolaTitikAir({
 
   const tutupEdit = () => {
     if (sedangMenyimpan) return;
+
     setEditId(null);
     setPratinjau("");
   };
@@ -143,12 +160,14 @@ export default function KelolaTitikAir({
 
   const tutupHapus = () => {
     if (sedangMenghapus) return;
+
     setHapusId(null);
     setGalatHapus("");
     setPratinjau("");
   };
 
-  // Tombol "Pratinjau": membuka modal sesuai state yang dipilih memakai titik air pertama.
+  // ---------- Pratinjau Figma Make ----------
+
   const bukaPratinjau = (id) => {
     tutupSemua();
     setPesan("");
@@ -156,42 +175,65 @@ export default function KelolaTitikAir({
     setKunciForm((k) => k + 1);
 
     const pertama = titik[0]?.id ?? null;
-    if (id.startsWith("edit")) setEditId(pertama);
-    if (id.startsWith("add")) setTambahTerbuka(true);
-    if (id.startsWith("delete")) setHapusId(pertama);
+
+    if (id.startsWith("edit")) {
+      setEditId(pertama);
+    }
+
+    if (id.startsWith("add")) {
+      setTambahTerbuka(true);
+    }
+
+    if (id.startsWith("delete")) {
+      setHapusId(pertama);
+    }
   };
 
-  // ---------- Menyimpan perubahan (modal Edit) ----------
+  // ---------- Menyimpan perubahan titik air ----------
 
-  // Mengembalikan { success, message } agar modal bisa menampilkan galat sendiri.
   const simpan = async (id, perubahan, sumber) => {
     setPesan("");
+
     const item = titik.find((t) => t.id === id);
     const namaTampil = perubahan.name || item?.name || "";
 
-    // Mode pratinjau: HANYA simulasi. Tidak ada data asli yang diubah.
+    // Pratinjau tidak mengubah database
     if (pratinjau) {
       setSedangMenyimpan(true);
-      await tunggu(700);
-      setSedangMenyimpan(false);
-      setEditId(null);
-      setPratinjau("");
-      setPesan(
-        `Pratinjau: perubahan "${namaTampil}" disimulasikan dan tidak disimpan.`
-      );
-      return { success: true };
+
+      try {
+        await tunggu(700);
+
+        setEditId(null);
+        setPratinjau("");
+
+        setPesan(
+          `Pratinjau: perubahan "${namaTampil}" disimulasikan dan tidak disimpan.`
+        );
+
+        return { success: true };
+      } finally {
+        setSedangMenyimpan(false);
+      }
     }
 
     const jalankan = simpanTitikAirAction ?? simpanBawaan;
+
     setSedangMenyimpan(true);
 
     try {
-      const hasil = await jalankan({ pointId: id, perubahan, sumber });
+      const hasil = await jalankan({
+        pointId: id,
+        perubahan,
+        sumber,
+      });
 
       if (!hasil?.success) {
         return {
           success: false,
-          message: hasil?.message || "Perubahan titik air gagal disimpan.",
+          message:
+            hasil?.message ||
+            "Perubahan titik air gagal disimpan.",
         };
       }
 
@@ -207,11 +249,20 @@ export default function KelolaTitikAir({
             : t
         )
       );
+
       setEditId(null);
-      setPesan(`Perubahan "${namaTampil}" tersimpan dan tampil di Navigasi Air.`);
+
+      setPesan(
+        `Perubahan "${namaTampil}" tersimpan dan tampil di Navigasi Air.`
+      );
+
       return { success: true };
     } catch (error) {
-      console.error("Gagal menyimpan perubahan titik air:", error);
+      console.error(
+        "Gagal menyimpan perubahan titik air:",
+        error
+      );
+
       return {
         success: false,
         message:
@@ -223,58 +274,89 @@ export default function KelolaTitikAir({
     }
   };
 
-  // ---------- Menghapus (menonaktifkan) titik air ----------
+  // ---------- Menghapus titik air secara permanen ----------
 
   const konfirmasiHapus = async () => {
     if (!itemHapus || sedangMenghapus) return;
 
     const { id, name } = itemHapus;
+
     setGalatHapus("");
     setSedangMenghapus(true);
 
-    // Mode pratinjau: simulasi saja, titik air asli TIDAK dinonaktifkan.
+    // Pratinjau hanya simulasi, tidak menghapus data database
     if (pratinjau) {
-      await tunggu(800);
-      setSedangMenghapus(false);
-      setHapusId(null);
-      setPratinjau("");
-      setPesan(`Pratinjau: penghapusan "${name}" disimulasikan dan tidak dijalankan.`);
+      try {
+        await tunggu(800);
+
+        setHapusId(null);
+        setPratinjau("");
+
+        setPesan(
+          `Pratinjau: penghapusan "${name}" disimulasikan dan tidak dijalankan.`
+        );
+      } finally {
+        setSedangMenghapus(false);
+      }
+
       return;
     }
 
-  const hapusTitikAir = async (item) => {
-    const konfirmasi = window.confirm(`Hapus permanen titik air "${item.name || "Tanpa nama"}" dari database? Riwayat kontribusi/review akan tetap dipertahankan dan relasinya dilepas.`);
-    if (!konfirmasi) return;
-    setPesan(null);
-    setSedangMenghapusId(item.id);
     try {
-      const hasil = await hapusTitikAirAction(item.id);
-      if (!hasil?.success) throw new Error(hasil?.message || "Titik air gagal dihapus.");
-      setTitik((items) => items.filter((t) => t.id !== item.id));
-      if (editId === item.id) setEditId(null);
-      setPesan({ type: "success", text: hasil.message || "Titik air berhasil dihapus dari database." });
+      const hasil = await hapusTitikAirAction(id);
+
+      if (!hasil?.success) {
+        throw new Error(
+          hasil?.message || "Titik air gagal dihapus."
+        );
+      }
+
+      // Perbarui daftar hanya setelah backend berhasil
+      setTitik((items) =>
+        items.filter((t) => t.id !== id)
+      );
+
+      if (editId === id) {
+        setEditId(null);
+      }
+
+      setHapusId(null);
+
+      setPesan(
+        hasil.message ||
+          `Titik air "${name}" berhasil dihapus dari database.`
+      );
     } catch (error) {
-      setPesan({ type: "error", text: error?.message || "Gagal menghapus titik air. Daftar tidak diubah." });
+      console.error("Gagal menghapus titik air:", error);
+
+      setGalatHapus(
+        error?.message ||
+          "Gagal menghapus titik air. Daftar tidak diubah."
+      );
     } finally {
       setSedangMenghapus(false);
     }
   };
 
-  const sedangHapusBaris = (id) => menghapusTampil && hapusId === id;
+  const sedangHapusBaris = (id) =>
+    menghapusTampil && hapusId === id;
 
-  // Tombol Edit & Hapus dipakai di tabel (desktop) dan kartu (HP/tablet).
+  // Konten tombol hapus
   const tombolHapusIsi = (t) =>
     sedangHapusBaris(t.id) ? (
       "Menghapus..."
     ) : (
       <>
-        <Trash2 className="size-4" /> Hapus
+        <Trash2 className="size-4" />
+        Hapus
       </>
     );
 
+  // ---------- Tampilan halaman ----------
+
   return (
     <div className="space-y-6">
-      {/* Judul halaman + tombol Tambah */}
+      {/* Judul halaman dan tombol tambah */}
       <div className="flex flex-wrap items-end justify-between gap-4">
         <AdminPageHeader
           large
@@ -287,18 +369,22 @@ export default function KelolaTitikAir({
           onClick={bukaTambah}
           className={`${tombolUtama} inline-flex w-full items-center justify-center gap-2 sm:w-auto`}
         >
-          <Plus className="size-5" /> Tambah Titik Air
+          <Plus className="size-5" />
+          Tambah Titik Air
         </button>
       </div>
 
-      {/* Pratinjau state (alat bantu desain dari Figma Make) */}
+      {/* Tombol pratinjau Figma Make */}
       {TAMPILKAN_PRATINJAU && (
         <div
           className="flex flex-wrap items-center gap-2 text-sm"
           role="group"
           aria-label="Pratinjau state"
         >
-          <span className="font-semibold text-aira-text/65">Pratinjau:</span>
+          <span className="font-semibold text-aira-text/65">
+            Pratinjau:
+          </span>
+
           {PRATINJAU.map((p) => (
             <button
               key={p.id}
@@ -314,12 +400,16 @@ export default function KelolaTitikAir({
 
       <Toast text={pesan} />
 
-      {/* Kartu: pencarian + filter + tabel */}
+      {/* Pencarian, filter, dan daftar titik air */}
       <section className={kartuUtama}>
         <div className="grid gap-3 md:grid-cols-[1fr_220px]">
           <label className="relative">
-            <span className="sr-only">Cari titik air</span>
+            <span className="sr-only">
+              Cari titik air
+            </span>
+
             <Search className="absolute left-4 top-1/2 size-5 -translate-y-1/2 text-aira-primary" />
+
             <input
               value={kataKunci}
               onChange={(e) => setKataKunci(e.target.value)}
@@ -335,6 +425,7 @@ export default function KelolaTitikAir({
             className={kolomForm}
           >
             <option value="Semua">Semua</option>
+
             {KETERSEDIAAN.map((k) => (
               <option key={k} value={k}>
                 {k}
@@ -343,17 +434,33 @@ export default function KelolaTitikAir({
           </select>
         </div>
 
-        {/* Tabel desktop (layar >= 1280px) */}
+        {/* Tabel desktop */}
         <table className="mt-4 hidden w-full table-fixed text-left text-base xl:table">
           <thead>
             <tr className="border-b border-aira-primary/10">
-              <th className={`${thTabel} w-[24%]`}>Titik air</th>
-              <th className={`${thTabel} w-[15%]`}>Wilayah</th>
-              <th className={`${thTabel} w-[170px]`}>Ketersediaan</th>
-              <th className={`${thTabel} w-[26%] whitespace-nowrap`}>
+              <th className={`${thTabel} w-[24%]`}>
+                Titik air
+              </th>
+
+              <th className={`${thTabel} w-[15%]`}>
+                Wilayah
+              </th>
+
+              <th className={`${thTabel} w-[170px]`}>
+                Ketersediaan
+              </th>
+
+              <th
+                className={`${thTabel} w-[26%] whitespace-nowrap`}
+              >
                 Jam operasional
               </th>
-              <th className={`${thTabel} w-[136px] text-right`}>Aksi</th>
+
+              <th
+                className={`${thTabel} w-[136px] text-right`}
+              >
+                Aksi
+              </th>
             </tr>
           </thead>
 
@@ -367,6 +474,7 @@ export default function KelolaTitikAir({
                   <p className="font-semibold text-aira-primary wrap-break-word">
                     {t.name || "Tanpa nama"}
                   </p>
+
                   <p className="text-sm text-aira-text/65">
                     {formatCategory(t.type)}
                   </p>
@@ -377,22 +485,42 @@ export default function KelolaTitikAir({
                 </td>
 
                 <td className={`${tdTabel} whitespace-nowrap`}>
-                  <AvailabilityBadge v={formatAvailability(t.availability)} />
+                  <AvailabilityBadge
+                    v={formatAvailability(t.availability)}
+                  />
                 </td>
 
                 <td className={tdTabel}>
                   <p className="text-aira-text/80 wrap-break-word">
                     {t.hours || "Belum diketahui"}
                   </p>
+
                   <p className="text-sm text-aira-text/65">
                     {t.updated || "Belum ada informasi pembaruan"}
                   </p>
                 </td>
 
-                <td className={td}>
-                  <div className="flex justify-end gap-2">
-                    <TombolEdit onClick={() => setEditId(t.id)} />
-                    <button type="button" disabled={sedangMenghapusId === t.id} onClick={() => hapusTitikAir(t)} aria-label={`Hapus ${t.name}`} title="Hapus titik air secara permanen" className="inline-flex min-w-10 items-center justify-center gap-2 rounded-full border border-red-200 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"><Trash2 className="size-4" />{sedangMenghapusId === t.id ? "..." : "Hapus"}</button>
+                <td className={tdTabel}>
+                  <div className="flex flex-col items-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => bukaEdit(t.id)}
+                      aria-label={`Edit ${t.name}`}
+                      className={tombolEdit}
+                    >
+                      <Pencil className="size-4" />
+                      Edit
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => bukaHapus(t.id)}
+                      disabled={sedangHapusBaris(t.id)}
+                      aria-label={`Hapus ${t.name}`}
+                      className={tombolHapus}
+                    >
+                      {tombolHapusIsi(t)}
+                    </button>
                   </div>
                 </td>
               </tr>
@@ -400,7 +528,7 @@ export default function KelolaTitikAir({
           </tbody>
         </table>
 
-        {/* Kartu HP / tablet (layar < 1280px) */}
+        {/* Kartu HP dan tablet */}
         <ul className="mt-4 space-y-3 xl:hidden">
           {daftar.map((t) => (
             <li
@@ -410,26 +538,50 @@ export default function KelolaTitikAir({
               <p className="font-semibold text-aira-primary wrap-break-word">
                 {t.name || "Tanpa nama"}
               </p>
+
               <p className="text-sm text-aira-text/65">
                 {formatCategory(t.type)}
               </p>
+
               <p className="mt-2 text-base text-aira-text/75">
                 {t.area || "Wilayah belum tersedia"}
               </p>
 
               <div className="mt-3 whitespace-nowrap">
-                <AvailabilityBadge v={formatAvailability(t.availability)} />
+                <AvailabilityBadge
+                  v={formatAvailability(t.availability)}
+                />
               </div>
 
               <p className="mt-3 text-base text-aira-text/80">
                 {t.hours || "Belum diketahui"}
               </p>
+
               <p className="text-sm text-aira-text/65">
                 {t.updated || "Belum ada informasi pembaruan"}
               </p>
 
-              <TombolEdit onClick={() => setEditId(t.id)} penuh />
-              <button type="button" disabled={sedangMenghapusId === t.id} onClick={() => hapusTitikAir(t)} className="mt-2 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-full border border-red-200 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"><Trash2 className="size-4" />{sedangMenghapusId === t.id ? "Menghapus..." : "Hapus titik air"}</button>
+              <div className="mt-4 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => bukaEdit(t.id)}
+                  aria-label={`Edit ${t.name}`}
+                  className={`${tombolEdit} w-full! flex-1`}
+                >
+                  <Pencil className="size-4" />
+                  Edit
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => bukaHapus(t.id)}
+                  disabled={sedangHapusBaris(t.id)}
+                  aria-label={`Hapus ${t.name}`}
+                  className={`${tombolHapus} w-full! flex-1`}
+                >
+                  {tombolHapusIsi(t)}
+                </button>
+              </div>
             </li>
           ))}
         </ul>
@@ -445,7 +597,7 @@ export default function KelolaTitikAir({
         </p>
       </section>
 
-      {/* Modal Edit */}
+      {/* Modal edit */}
       {itemEdit && (
         <PanelEditTitikAir
           key={`${itemEdit.id}-${kunciForm}`}
@@ -454,14 +606,15 @@ export default function KelolaTitikAir({
           terkunci={sedangMenyimpan}
           galatPratinjau={pratinjau === "edit-error"}
           pratinjauTerkunci={
-            pratinjau === "edit-saving" || pratinjau === "edit-error"
+            pratinjau === "edit-saving" ||
+            pratinjau === "edit-error"
           }
           onClose={tutupEdit}
           onSimpan={simpan}
         />
       )}
 
-      {/* Modal Tambah */}
+      {/* Modal tambah */}
       {tambahTerbuka && (
         <FormTambahTitikAir
           key={`tambah-${kunciForm}`}
@@ -476,7 +629,7 @@ export default function KelolaTitikAir({
         />
       )}
 
-      {/* Dialog Hapus */}
+      {/* Dialog konfirmasi hapus */}
       {itemHapus && (
         <DeleteDialog
           nama={itemHapus.name || "Tanpa nama"}
