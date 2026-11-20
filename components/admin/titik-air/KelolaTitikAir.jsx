@@ -49,7 +49,7 @@ export default function KelolaTitikAir({
   const [tambahTerbuka, setTambahTerbuka] = useState(false);
   const [hapusId, setHapusId] = useState(null);
 
-  // Status proses
+  // Status proses sebenarnya
   const [sedangMenyimpan, setSedangMenyimpan] = useState(false);
   const [sedangMenghapus, setSedangMenghapus] = useState(false);
   const [galatHapus, setGalatHapus] = useState("");
@@ -257,29 +257,31 @@ export default function KelolaTitikAir({
   // ---------- Tampilan halaman ----------
 
   return (
-    <div className="space-y-6">
-      {/* Judul halaman dan tombol tambah */}
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <AdminPageHeader
-          large
-          title="Kelola Titik Air"
-          description="Direktori titik air terverifikasi yang tampil di Navigasi Air. Perbarui ketersediaan dan informasi operasional berdasarkan sumber informasi yang jelas."
-        />
-
-        <button
-          type="button"
-          onClick={bukaTambah}
-          disabled={sedangMenyimpan || sedangMenghapus}
-          className={`${tombolUtama} inline-flex w-full items-center justify-center gap-2 sm:w-auto`}
-        >
-          <Plus className="size-5" />
-          Tambah Titik Air
-        </button>
-      </div>
+    <div className="space-y-8">
+      {/* HEADER HALAMAN */}
+      <AdminPageHeader
+        title="Kelola Titik Air"
+        description="Direktori titik air terverifikasi yang tampil di Navigasi Air. Perbarui ketersediaan dan informasi operasional berdasarkan sumber informasi yang jelas."
+        action={
+          <div className="sm:mt-8">
+            <button
+              type="button"
+              onClick={bukaTambah}
+              disabled={sedangMenyimpan || sedangMenghapus}
+              className={`${tombolUtama} inline-flex w-full items-center justify-center gap-2 sm:w-auto`}
+            >
+              <Plus className="size-5" />
+              Tambah Titik Air
+            </button>
+          </div>
+        }
+      />
 
       <Toast text={pesan} />
 
-      {/* Pencarian, filter, dan daftar titik air */}
+    {/* Lanjutkan bagian pencarian, filter dan tabel seperti kode sebelumnya */}
+
+      {/* PENCARIAN, FILTER, DAN DAFTAR TITIK AIR */}
       <section className={kartuUtama}>
         <div className="grid gap-3 md:grid-cols-[1fr_220px]">
           <label className="relative">
@@ -313,7 +315,7 @@ export default function KelolaTitikAir({
           </select>
         </div>
 
-        {/* Tabel desktop */}
+        {/* TABEL DESKTOP */}
         <table className="mt-4 hidden w-full table-fixed text-left text-base xl:table">
           <thead>
             <tr className="border-b border-aira-primary/10">
@@ -329,15 +331,11 @@ export default function KelolaTitikAir({
                 Ketersediaan
               </th>
 
-              <th
-                className={`${thTabel} w-[26%] whitespace-nowrap`}
-              >
+              <th className={`${thTabel} w-[26%] whitespace-nowrap`}>
                 Jam operasional
               </th>
 
-              <th
-                className={`${thTabel} w-[136px] text-right`}
-              >
+              <th className={`${thTabel} w-[136px] text-right`}>
                 Aksi
               </th>
             </tr>
@@ -408,7 +406,7 @@ export default function KelolaTitikAir({
           </tbody>
         </table>
 
-        {/* Kartu HP dan tablet */}
+        {/* KARTU HP DAN TABLET */}
         <ul className="mt-4 space-y-3 xl:hidden">
           {daftar.map((t) => (
             <li
@@ -467,6 +465,7 @@ export default function KelolaTitikAir({
           ))}
         </ul>
 
+        {/* EMPTY STATE */}
         {daftar.length === 0 && (
           <p className="mt-4 rounded-[16px] bg-aira-bg p-8 text-center text-base text-aira-text/70">
             Tidak ada titik air yang cocok dengan pencarian.
@@ -478,7 +477,7 @@ export default function KelolaTitikAir({
         </p>
       </section>
 
-      {/* Modal edit */}
+      {/* MODAL EDIT */}
       {itemEdit && (
         <PanelEditTitikAir
           key={itemEdit.id}
@@ -490,14 +489,14 @@ export default function KelolaTitikAir({
         />
       )}
 
-      {/* Modal tambah */}
+      {/* MODAL TAMBAH */}
       {tambahTerbuka && (
         <FormTambahTitikAir
           onClose={tutupTambah}
         />
       )}
 
-      {/* Dialog konfirmasi hapus */}
+      {/* DIALOG KONFIRMASI HAPUS */}
       {itemHapus && (
         <DeleteDialog
           nama={itemHapus.name || "Tanpa nama"}

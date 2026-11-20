@@ -4,44 +4,34 @@
 // Mode `large`: judul besar seperti di Figma Make untuk C03 (judul 36px, deskripsi 18px).
 //   Di mode ini tombol aksi ditaruh oleh halaman pemanggil (lihat KelolaTitikAir),
 //   sehingga prop `action` tidak dipakai.
+
+// Header halaman admin dengan jarak yang konsisten.
+// components/admin/AdminPageHeader.jsx
+
 export default function AdminPageHeader({
   title,
   description,
   action,
-  large = false,
 }) {
-  if (large) {
-    return (
-      <header>
-        <p className="text-xs text-aira-primary/70">Panel Admin / {title}</p>
-        <h1 className="mt-1 text-4xl font-bold leading-tight text-aira-primary">
-          {title}
-        </h1>
-        {description && (
-          <p className="mt-3 max-w-[672px] text-lg text-aira-text/70">
-            {description}
-          </p>
-        )}
-      </header>
-    );
-  }
-
   return (
-    <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-      <div className="space-y-1.5">
-        <p className="text-xs font-medium text-aira-primary/65">
-          Panel Admin / {title}
-        </p>
-        <h1 className="text-2xl font-bold leading-tight tracking-tight text-aira-primary">
+    <header className="flex flex-col gap-4 border-b border-aira-primary/10 pb-5 sm:flex-row sm:items-center sm:justify-between">
+      <div className="min-w-0 space-y-1">
+        <h1 className="text-2xl font-bold text-aira-primary sm:text-[28px]">
           {title}
         </h1>
+
         {description && (
-          <p className="max-w-2xl text-sm leading-relaxed text-aira-text/60">
+          <p className="text-sm leading-relaxed text-aira-text-secondary">
             {description}
           </p>
         )}
       </div>
-      {action}
+
+      {action && (
+        <div className="shrink-0">
+          {action}
+        </div>
+      )}
     </header>
   );
 }
