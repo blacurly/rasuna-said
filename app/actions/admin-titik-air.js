@@ -118,33 +118,20 @@ export async function simpanTitikAirAction({ pointId, perubahan, sumber }) {
 }
 
 // Soft-delete: nonaktifkan titik air terverifikasi tanpa menghapus histori/relasi.
-export async function nonaktifkanTitikAirAction(pointId) {
+export async function hapusTitikAirAction(pointId) {
   try {
-    const { supabase, user } = await requireApiAdmin();
+    const { supabase } = await requireApiAdmin();
     const id = Number(pointId);
-    if (!Number.isSafeInteger(id) || id <= 0) {
-      return { success: false, message: "ID titik air tidak valid." };
-    }
-
-    const { data, error } = await supabase
-      .from("water_points")
-      .update({ is_active: false, updated_at: new Date().toISOString() })
-      .eq("water_point_id", id)
-      .eq("verification_status", "verified")
-      .eq("is_active", true)
-      .select("water_point_id")
-      .maybeSingle();
-
+    if (!Number.isSafeInteger(id) || id <= 0) return { success: false, message: "ID titik air tidak valid." };
+    const { data, error } = await supabase.from("water_points").update({ is_active: false, updated_at: new Date().toISOString() }).eq("water_point_id", id).select("water_point_id, point_name, is_active").maybeSingle();
     if (error) throw error;
-    if (!data) return { success: false, message: "Titik air tidak ditemukan, sudah nonaktif, atau tidak dapat diakses." };
-
-    console.info("[AIRA Admin] Titik air dinonaktifkan", { waterPointId: id, adminUserId: user.id });
+    if (!data) return { success: false, message: "Titik air tidak ditemukan atau sudah dihapus." };
     revalidatePath("/admin/kelola-titik-air");
     revalidatePath("/navigasi-air");
     revalidatePath(`/navigasi-air/${id}`);
-    return { success: true, message: "Titik air berhasil dinonaktifkan dan dihapus dari daftar aktif." };
+    return { success: true, message: "Titik air berhasil dinonaktifkan." };
   } catch (error) {
-    console.error("[AIRA Admin] Gagal menonaktifkan titik air:", error);
-    return { success: false, message: error?.message || "Gagal menonaktifkan titik air." };
+    console.error("Gagal menghapus titik air:", error);
+    return { success: false, message: error?.message || "Titik air gagal dihapus." };
   }
 }

@@ -81,7 +81,10 @@ Identitas pengguna diambil dari `supabase.auth.getUser()` pada server. Jangan me
 | POST | `/api/water-assessments` | Publik; simpan jika login | Menghitung ketahanan air; riwayat tersimpan jika sesi pengguna tersedia dan penyimpanan berhasil. |
 | GET | `/api/water-assessments` | Login | Riwayat asesmen milik pengguna. |
 | GET | `/api/water-assessments/{id}` | Login | Detail asesmen milik pengguna. |
+| PATCH | `/api/water-assessments/{id}` | Login | Memperbarui catatan assessment milik pengguna. |
+| DELETE | `/api/water-assessments/{id}` | Login | Menghapus assessment dan dependensi langsung via RPC terotorisasi. |
 | GET | `/api/households` | Login | Mengambil data rumah tangga terbaru milik pengguna. |
+| PATCH, DELETE | `/api/households/{id}` | Login | Memperbarui/menghapus rumah tangga; DELETE ditolak bila memiliki dependensi. |
 | POST | `/api/households` | Login | Membuat profil rumah tangga pertama atau memperbarui profil terbaru. |
 | GET | `/api/contributions` | Login | Riwayat kontribusi milik pengguna. |
 | POST | `/api/contributions` | Login | Mengirim usulan titik air; tidak langsung memublikasikan titik. |
@@ -231,6 +234,15 @@ Kontribusi merupakan usulan. Data baru tidak boleh langsung muncul sebagai titik
 
 Untuk keputusan `approved`, `availabilityStatus` wajib diisi dengan salah satu nilai: `available`, `limited`, `unavailable`, atau `unknown`.
 
+
+### Delete riwayat assessment
+
+`DELETE /api/water-assessments/{id}` memerlukan sesi pengguna. Endpoint memanggil RPC `delete_my_water_assessment` yang memeriksa kepemilikan dengan `auth.uid()` dan menghapus assessment beserta rekomendasi serta interaksi Assistant yang secara langsung terkait dalam satu transaksi. Profil rumah tangga dan data lain yang tidak terhubung langsung tidak dihapus. Respons sukses berisi `assessment_id`.
+
+### Pengelolaan titik air admin
+
+`DELETE /api/admin/water-points/{id}` menonaktifkan titik (`is_active=false`) agar data dan relasi tetap terpelihara; ini bukan hard delete.
+
 ## Status Full CRUD saat ini
 
 Kriteria Full CRUD berarti tersedia operasi Create, Read, Update, dan Delete yang benar-benar bekerja pada resource terkait. Kondisi route saat ini:
@@ -294,3 +306,15 @@ Semua endpoint berikut memerlukan sesi login Supabase dan role admin aktif yang 
 - `DELETE /api/admin/water-points/{id}`: soft delete/penonaktifan (`is_active=false`); data tidak dihapus permanen.
 
 Sumber air yang didukung: `public_well`, `spring`, `storage_tank`, `emergency_tank`, `hydrant`, `reservoir`, `water_station`, `other`. Status ketersediaan: `available`, `limited`, `unavailable`, `unknown`.
+
+
+## Admin water points
+
+- `GET /api/admin/water-points`: daftar terfilter/paginasi (admin only).
+- `POST /api/admin/water-points`: tambah titik (admin only).
+- `GET /api/admin/water-points/{id}`: detail (admin only).
+- `PATCH /api/admin/water-points/{id}`: edit (admin only).
+- `DELETE /api/admin/water-points/{id}`: hard delete row pada `water_points`; setelah migrasi FK, contribution.water_point_id akan NULL dan riwayat review tidak ikut terhapus.
+- `GET /api/admin/overview`: ringkasan live dari Supabase (admin only).
+
+Public `/api/water-navigation` tetap hanya menampilkan record active + verified + non-simulation.

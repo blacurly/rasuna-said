@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CirclePlus, MapPinPlus, Plus } from "lucide-react";
+import { CirclePlus, MapPinPlus, Plus, Trash2, X } from "lucide-react";
 
 import DashboardPageHead from "@/components/dashboard/DashboardPageHead";
 import { kirimKontribusiUserAction } from "@/app/actions/kontribusi-user";
@@ -20,6 +20,9 @@ export default function KontribusiClient({ items }) {
   const [open, setOpen] = useState(false);
   const [sent, setSent] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [cancelTarget, setCancelTarget] = useState(null);
+  const [cancelError, setCancelError] = useState("");
+  const [cancelLoading, setCancelLoading] = useState(false);
   const triggerRef = useRef(null);
 
   const showEmpty = items.length === 0 && !sent;
@@ -46,16 +49,29 @@ export default function KontribusiClient({ items }) {
   }
 
   async function hapus(item) {
-    const yakin = window.confirm(`Batalkan kontribusi "${item.name}"? Tindakan ini hanya tersedia selama kontribusi masih menunggu verifikasi.`);
-    if (!yakin) return;
-    const response = await fetch(`/api/contributions/${item.id}`, { method: "DELETE" });
-    const result = await response.json().catch(() => null);
-    if (!response.ok || !result?.success) {
-      window.alert(result?.message || "Kontribusi belum dapat dibatalkan. Coba muat ulang halaman.");
-      return;
+    setCancelTarget(item);
+    setCancelError("");
+  }
+
+  async function konfirmasiBatalkan() {
+    if (!cancelTarget || cancelLoading) return;
+    setCancelLoading(true);
+    setCancelError("");
+    try {
+      const response = await fetch(`/api/contributions/${cancelTarget.id}`, { method: "DELETE" });
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result?.success) {
+        setCancelError(result?.message || "Kontribusi belum dapat dibatalkan. Coba muat ulang halaman.");
+        return;
+      }
+      setCancelTarget(null);
+      setSent(false);
+      router.refresh();
+    } catch {
+      setCancelError("Koneksi bermasalah. Kontribusi belum dibatalkan.");
+    } finally {
+      setCancelLoading(false);
     }
-    setSent(false);
-    router.refresh();
   }
 
   return (
@@ -94,6 +110,19 @@ export default function KontribusiClient({ items }) {
             </p>
           )}
           <ContributionList items={items} onEdit={bukaForm} onDelete={hapus} />
+        </section>
+      )}
+
+
+      {cancelTarget && (
+        <section className="rounded-2xl border border-aira-danger-text/20 bg-aira-peach/15 p-5" aria-labelledby="cancel-contribution-title">
+          <h3 id="cancel-contribution-title" className="font-semibold text-aira-primary">Batalkan kontribusi?</h3>
+          <p className="mt-2 text-sm leading-relaxed text-aira-text/75">Kontribusi <strong>{cancelTarget.name}</strong> akan dibatalkan. Tindakan ini hanya tersedia selama kontribusi menunggu verifikasi.</p>
+          {cancelError && <p role="alert" className="mt-3 rounded-xl bg-white px-3 py-2 text-sm text-aira-danger-text">{cancelError}</p>}
+          <div className="mt-4 flex flex-wrap gap-3">
+            <button type="button" disabled={cancelLoading} onClick={konfirmasiBatalkan} className="inline-flex min-h-11 items-center gap-2 rounded-full bg-aira-danger-text px-5 py-2 font-semibold text-white disabled:opacity-60"><Trash2 className="size-4"/>{cancelLoading ? "Membatalkan…" : "Ya, batalkan"}</button>
+            <button type="button" disabled={cancelLoading} onClick={() => setCancelTarget(null)} className="inline-flex min-h-11 items-center gap-2 rounded-full border border-aira-primary/20 px-5 py-2 font-semibold text-aira-primary"><X className="size-4"/>Kembali</button>
+          </div>
         </section>
       )}
 

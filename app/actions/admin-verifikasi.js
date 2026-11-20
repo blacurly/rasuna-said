@@ -1,5 +1,7 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
+
 import {
   getAdminWaterPointContributions,
   reviewWaterPointContribution,
@@ -89,6 +91,9 @@ export async function reviewContributionAction({
           : null,
     });
 
+    revalidatePath("/admin/verifikasi");
+    revalidatePath("/navigasi-air");
+    revalidatePath("/dashboard/kontribusi");
     return {
       success: true,
       data,

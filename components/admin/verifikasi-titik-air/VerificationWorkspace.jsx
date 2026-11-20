@@ -4,6 +4,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 
@@ -38,6 +39,9 @@ export default function VerificationWorkspace() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  // Pengunci sinkron untuk mencegah request verifikasi ganda.
+  const savingRef = useRef(false);
 
   // Pemuatan awal data dari database.
   useEffect(() => {
@@ -101,6 +105,7 @@ export default function VerificationWorkspace() {
     }
   }, []);
 
+  // Menghitung kontribusi yang menunggu verifikasi.
   const waitingCount = useMemo(() => {
     return contributions.filter(
       (item) =>
@@ -109,6 +114,7 @@ export default function VerificationWorkspace() {
     ).length;
   }, [contributions]);
 
+  // Menghitung kontribusi yang sudah mendapatkan keputusan.
   const reviewedCount = useMemo(() => {
     return contributions.filter(
       (item) =>
@@ -117,6 +123,7 @@ export default function VerificationWorkspace() {
     ).length;
   }, [contributions]);
 
+  // Memfilter data berdasarkan tab aktif.
   const filteredData = useMemo(() => {
     return contributions.filter((item) => {
       if (activeTab === "waiting") {
@@ -140,8 +147,11 @@ export default function VerificationWorkspace() {
     notes,
     availabilityStatus
   ) {
-    if (saving) return;
+    // Pemeriksaan sinkron sebelum request dikirim.
+    if (savingRef.current) return;
 
+    // Kunci langsung agar pemanggilan berdekatan ditolak.
+    savingRef.current = true;
     setSaving(true);
     setError("");
 
@@ -160,9 +170,11 @@ export default function VerificationWorkspace() {
         );
       }
 
+      // Tutup detail dan pindahkan ke tab hasil pemeriksaan.
       setSelectedItem(null);
       setActiveTab("reviewed");
 
+      // Perbarui data setelah keputusan berhasil disimpan.
       await loadContributions();
     } catch (err) {
       console.error(
@@ -175,6 +187,8 @@ export default function VerificationWorkspace() {
           "Terjadi kesalahan saat menyimpan keputusan."
       );
     } finally {
+      // Selalu lepaskan kunci setelah proses selesai.
+      savingRef.current = false;
       setSaving(false);
     }
   }
@@ -245,7 +259,7 @@ export default function VerificationWorkspace() {
         <VerificationDetail
           item={selectedItem}
           onClose={() => {
-            if (!saving) {
+            if (!savingRef.current) {
               setSelectedItem(null);
             }
           }}

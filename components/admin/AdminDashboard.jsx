@@ -31,11 +31,7 @@ import {
   adminBtnSm,
 } from "@/components/admin/adminStyles";
 
-import {
-  MOCK_ADMIN,
-  MOCK_ADMIN_STATS,
-  MOCK_CONTRIBUTION_STATUS,
-} from "@/data/admin/mockAdmin";
+import { MOCK_ADMIN } from "@/data/admin/mockAdmin";
 
 // ============================================
 // ICON DAN WARNA KARTU STATISTIK
@@ -298,52 +294,52 @@ function AdminUserStatistics({ refreshKey, onManage }) {
 // STATUS SELURUH KONTRIBUSI
 // ============================================
 
-function ContributionStatus() {
-  const total = MOCK_CONTRIBUTION_STATUS.reduce(
-    (sum, item) => sum + item.value,
-    0
-  );
-
-  return (
-    <section className={`${adminCard} px-5 py-5 sm:px-6`}>
-      <h2 className={`${adminH2} mb-4`}>Status seluruh kontribusi</h2>
-
-      <div
-        className="flex h-3.5 w-full overflow-hidden rounded-full bg-gray-100"
-        role="img"
-        aria-label={`Total ${total} kontribusi`}
-      >
-        {MOCK_CONTRIBUTION_STATUS.map((item) => (
-          <div
-            key={item.id}
-            style={{
-              width: total > 0 ? `${(item.value / total) * 100}%` : "0%",
-              backgroundColor: item.color,
-            }}
-            title={`${item.label}: ${item.value}`}
-          />
-        ))}
+function ContributionStatus({ refreshKey }) {
+  const [overview, setOverview] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const fetchOverview = useCallback(async () => {
+    setLoading(true); setError("");
+    try {
+      const response = await fetch("/api/admin/overview", { credentials: "same-origin", cache: "no-store" });
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.message || "Ringkasan dashboard gagal dimuat.");
+      setOverview(result.data);
+    } catch (err) { setError(err.message || "Ringkasan dashboard gagal dimuat."); }
+    finally { setLoading(false); }
+  }, []);
+  useEffect(() => { fetchOverview(); }, [fetchOverview, refreshKey]);
+  const statuses = [
+    { id: "approved", label: "Disetujui", color: "#176B78" },
+    { id: "pending", label: "Menunggu", color: "#4EA8DE" },
+    { id: "needs_revision", label: "Perlu Perbaikan", color: "#E5A01B" },
+    { id: "rejected", label: "Ditolak", color: "#D4573A" },
+  ];
+  const values = statuses.map((status) => ({ ...status, value: overview?.contribution_status?.[status.id] || 0 }));
+  const total = values.reduce((sum, item) => sum + item.value, 0);
+  return <section className={`${adminCard} px-5 py-5 sm:px-6`}>
+    <div className="flex items-start justify-between gap-3"><div><h2 className={`${adminH2} mb-1`}>Status seluruh kontribusi</h2><p className="text-sm text-aira-text/60">Ringkasan status yang dibaca langsung dari database.</p></div><button type="button" onClick={fetchOverview} disabled={loading} className={adminBtnOutline}><RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} />Refresh</button></div>
+    {error && <p role="alert" className="mt-3 text-sm text-red-700">{error}</p>}
+    {loading && !overview ? <div className="mt-5 h-3 animate-pulse rounded bg-gray-100" /> : <>
+      <div className="mt-5 flex h-3.5 w-full overflow-hidden rounded-full bg-gray-100" role="img" aria-label={`Total ${total} kontribusi`}>
+        {values.map((item) => <div key={item.id} title={`${item.label}: ${item.value}`} style={{ width: total ? `${item.value/total*100}%` : "0%", backgroundColor: item.color }} />)}
       </div>
+      <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2">{values.map((item) => <div key={item.id} className="flex items-center gap-2 text-sm text-aira-text/75"><span className="size-2.5 rounded-full" style={{backgroundColor:item.color}}/><span>{item.label}</span><span className="font-semibold text-aira-text">{item.value}</span></div>)}</div>
+      <p className="mt-3 text-xs text-aira-text/55">Total kontribusi: {total.toLocaleString("id-ID")}</p>
+    </>}
+  </section>;
+}
 
-      <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2">
-        {MOCK_CONTRIBUTION_STATUS.map((item) => (
-          <div
-            key={item.id}
-            className="flex items-center gap-2 text-sm text-aira-text/75"
-          >
-            <span
-              className="size-2.5 rounded-full"
-              style={{ backgroundColor: item.color }}
-            />
-
-            <span>{item.label}</span>
-
-            <span className="font-semibold text-aira-text">{item.value}</span>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
+function AdminOverviewCards({ refreshKey }) {
+  const [data, setData] = useState(null); const [loading, setLoading] = useState(true); const [error, setError] = useState("");
+  const load = useCallback(async () => { setLoading(true); setError(""); try { const response = await fetch("/api/admin/overview", { credentials: "same-origin", cache: "no-store" }); const result = await response.json(); if (!response.ok || !result.success) throw new Error(result.message || "Ringkasan gagal dimuat."); setData(result.data); } catch (e) { setError(e.message || "Ringkasan gagal dimuat."); } finally { setLoading(false); } }, []);
+  useEffect(() => { load(); }, [load, refreshKey]);
+  const cards = [
+    {id:"verified",title:"Titik Air Publik",value:data?.active_verified_points||0,description:"Aktif, terverifikasi, non-simulasi",icon:"droplet",color:"teal",href:"/admin/kelola-titik-air"},
+    {id:"pending",title:"Antrean Verifikasi",value:data?.contribution_status?.pending||0,description:"Kontribusi menunggu tinjauan",icon:"clipboard-list",color:"peach",href:"/admin/verifikasi"},
+    {id:"activity",title:"Total Titik Air",value:data?.total_water_points||0,description:"Record dalam tabel water_points",icon:"activity",color:"sage",href:"/admin/kelola-titik-air"},
+  ];
+  return <><div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">{cards.map((stat)=> <AdminStatCard key={stat.id} stat={{...stat,value:loading&&!data?"…":stat.value}}/> )}</div>{error&&<div role="alert" className="text-sm text-red-700">{error} <button type="button" onClick={load} className="underline">Coba lagi</button></div>}</>;
 }
 
 // ============================================
@@ -689,12 +685,8 @@ export default function AdminDashboard() {
           description="Pantau aktivitas pengelolaan data titik air, kontribusi warga, pengguna, dan status verifikasi dalam satu halaman."
         />
 
-        {/* STATISTIK TITIK AIR DAN AKTIVITAS */}
-        <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {MOCK_ADMIN_STATS.map((stat) => (
-            <AdminStatCard key={stat.id} stat={stat} />
-          ))}
-        </section>
+        {/* Statistik titik air dan antrean langsung dari database */}
+        <AdminOverviewCards refreshKey={refreshKey} />
 
         {/* STATISTIK PENGGUNA DARI SUPABASE */}
         <AdminUserStatistics
@@ -703,7 +695,7 @@ export default function AdminDashboard() {
         />
 
         {/* STATUS KONTRIBUSI */}
-        <ContributionStatus />
+        <ContributionStatus refreshKey={refreshKey} />
 
         {/* RIWAYAT AKTIVITAS DARI SUPABASE */}
         <AuditLogTable refreshKey={refreshKey} />

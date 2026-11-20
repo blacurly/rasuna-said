@@ -1,5 +1,4 @@
 import { createClient } from "@/lib/supabase/server";
-import { validateContributionPayload } from "@/lib/validation/contribution";
 
 const REVIEW_STATUS_LABELS = {
   pending: "Menunggu Verifikasi",
@@ -8,19 +7,6 @@ const REVIEW_STATUS_LABELS = {
   rejected: "Ditolak",
 };
 
-const ALLOWED_REVIEW_STATUSES = [
-  "approved",
-  "rejected",
-  "needs_revision",
-];
-
-const ALLOWED_AVAILABILITY_STATUSES = [
-  "available",
-  "limited",
-  "unavailable",
-  "unknown",
-];
-
 function throwIfError(error) {
   if (error) {
     throw new Error(
@@ -28,6 +14,10 @@ function throwIfError(error) {
     );
   }
 }
+
+// ======================================================
+// AUTHENTICATION & AUTHORIZATION
+// ======================================================
 
 async function getAuthenticatedClient() {
   const supabase = await createClient();
@@ -62,6 +52,10 @@ async function getAdminClient() {
   return { supabase, user };
 }
 
+// ======================================================
+// FORMAT HELPERS
+// ======================================================
+
 function formatSubmittedAt(value) {
   if (!value) return "-";
 
@@ -86,47 +80,55 @@ function formatCoordinates(latitude, longitude) {
   return `${latitude}, ${longitude}`;
 }
 
-function formatAddress(contribution, regions = {}) {
-  const parts = [
+function formatAddress(contribution) {
+  return [
     contribution.proposed_address_detail,
     contribution.proposed_village,
-    regions.districtName,
-    regions.regencyName,
-    regions.provinceName,
-    "Indonesia",
-  ].filter(Boolean);
-  const unique = parts.filter((part, index) =>
-    parts.findIndex((candidate) => candidate.toLocaleLowerCase("id-ID") === part.toLocaleLowerCase("id-ID")) === index
-  );
-  return unique.join(", ") || "-";
+  ]
+    .filter(Boolean)
+    .join(", ") || "-";
 }
 
-function parseManagerContact(value) {
-  const text = String(value || "").trim();
-  const marker = "Pengelola:";
-  const line = text.split("\n").find((item) => item.trim().startsWith(marker));
-  if (!line) return { name: "-", phone: "-" };
+// ======================================================
+// REVIEW HELPERS
+// ======================================================
 
-  const raw = line.trim().slice(marker.length).trim();
-  if (!raw) return { name: "-", phone: "-" };
+function normalizeReview(review) {
+  if (!review) return null;
 
-  // Format lama: "Pengelola: Nama, 08xxxxxxxxxx". Nama dapat mengandung koma,
-  // sehingga hanya bagian terakhir yang diperlakukan sebagai nomor bila berisi digit.
-  const parts = raw.split(",").map((item) => item.trim()).filter(Boolean);
-  const last = parts.at(-1) || "";
-  const phoneCandidate = last.replace(/[\s().+-]/g, "");
-  const hasPhone = /^\d{8,15}$/.test(phoneCandidate);
   return {
-    name: (hasPhone ? parts.slice(0, -1) : parts).join(", ") || "-",
-    phone: hasPhone ? last : "-",
+    ...review,
+
+    // Kompatibilitas dengan UI lama.
+    review_status: review.new_status,
+    review_notes: review.review_note,
+    reviewer_user_id: review.reviewed_by,
   };
 }
 
-function mapContributionToUI(contribution, latestReview, contributorName = null, regions = {}) {
-  const status =
-    latestReview?.review_status ||
-    contribution.status ||
-    "pending";
+function getReviewStatus(contribution, latestReview) {
+  // Status pada record kontribusi utama adalah status terkini. Review table
+  // dipakai sebagai fallback, bukan untuk menimpa status setelah pengguna revisi.
+  return contribution.status || latestReview?.new_status || "pending";
+}
+
+// ======================================================
+// MAP CONTRIBUTION TO ADMIN UI
+// ======================================================
+
+function mapContributionToUI(contribution, latestReview) {
+  const review = normalizeReview(latestReview);
+
+  const status = getReviewStatus(contribution, review);
+
+  const contributor = contribution.contributor ?? null;
+
+  const contributorName =
+    contributor?.full_name?.trim() ||
+    "Pengguna tidak ditemukan";
+
+  const contributorEmail =
+    contributor?.email?.trim() || "-";
 
   return {
     id: contribution.contribution_id,
@@ -139,20 +141,14 @@ function mapContributionToUI(contribution, latestReview, contributorName = null,
       REVIEW_STATUS_LABELS[status] ||
       "Menunggu Verifikasi",
 
-    // Status usulan kontributor hanya untuk informasi admin.
-    proposedAvailability:
+    availability:
       contribution.proposed_availability_status || "unknown",
 
-    // Status akhir tidak boleh mengambil keputusan dari kontributor.
-    // Admin menetapkan status ketersediaan setelah pemeriksaan.
-    availability: "unknown",
+    contributor: contributorName,
+    contributorName,
+    contributorEmail,
 
-    contributor:
-      contributorName ||
-      (contribution.contributor_user_id
-        ? `Warga #${String(contribution.contributor_user_id).slice(0, 6)}`
-        : "Warga"),
-    contributorUserId: contribution.contributor_user_id || null,
+    contributorId: contribution.contributor_user_id,
 
     submittedAt: formatSubmittedAt(
       contribution.submitted_at
@@ -161,48 +157,96 @@ function mapContributionToUI(contribution, latestReview, contributorName = null,
     category:
       contribution.proposed_water_source_type || "-",
 
-    contact: (() => {
-      const contact = parseManagerContact(contribution.proposed_access_information);
-      return contact.phone !== "-"
-        ? `${contact.name} (${contact.phone})`
-        : contact.name;
-    })(),
-    managerName: parseManagerContact(contribution.proposed_access_information).name,
-    managerPhone: parseManagerContact(contribution.proposed_access_information).phone,
+    contact: "-",
 
-    address: formatAddress(contribution, regions),
+    address: formatAddress(contribution),
 
     coordinates: formatCoordinates(
       contribution.proposed_latitude,
       contribution.proposed_longitude
     ),
 
-    description: contribution.proposed_description || "-",
-    accessInformation: contribution.proposed_access_information || "-",
+    description:
+      contribution.proposed_description ||
+      contribution.proposed_access_information ||
+      "-",
 
-    notes: contribution.notes || "",
-
-    adminReviewGuidance:
-      contribution.admin_review_guidance || "",
-
-    adminReviewNote:
-      contribution.admin_review_note || "",
+    notes:
+      review?.review_notes ??
+      contribution.admin_review_note ??
+      contribution.notes ??
+      "",
 
     evidenceUrl: contribution.evidence_url || null,
-    googleMapsUrl: contribution.evidence_url || null,
 
     contributionType: contribution.contribution_type,
 
-    waterPointId: contribution.water_point_id || null,
+    waterPointId: contribution.water_point_id,
 
     reviewStatus: status,
 
-    reviewedAt: contribution.reviewed_at || null,
+    // Data review lengkap tetap tersedia untuk UI.
+    review,
   };
 }
 
 // ======================================================
-// PUBLIC: Mengambil daftar titik air terverifikasi
+// FETCH LATEST REVIEWS
+// ======================================================
+
+async function getLatestReviews(
+  supabase,
+  contributionIds
+) {
+  if (!contributionIds?.length) {
+    return new Map();
+  }
+
+  const { data: reviews, error } = await supabase
+    .from("water_point_contribution_reviews")
+    .select(`
+      review_id,
+      contribution_id,
+      reviewed_by,
+      previous_status,
+      new_status,
+      review_note,
+      reviewed_at,
+      updated_by,
+      updated_at,
+      edit_reason,
+      is_archived,
+      archived_by,
+      archived_at,
+      archive_reason
+    `)
+    .in("contribution_id", contributionIds)
+    .eq("is_archived", false)
+    .order("reviewed_at", { ascending: false })
+    .order("review_id", { ascending: false });
+
+  throwIfError(error);
+
+  const latestReviewByContribution = new Map();
+
+  for (const review of reviews || []) {
+    if (
+      !latestReviewByContribution.has(
+        review.contribution_id
+      )
+    ) {
+      latestReviewByContribution.set(
+        review.contribution_id,
+        review
+      );
+    }
+  }
+
+  return latestReviewByContribution;
+}
+
+// ======================================================
+// PUBLIC: MENGAMBIL DAFTAR TITIK AIR TERVERIFIKASI
 // ======================================================
 
 export async function getPublicWaterPoints() {
@@ -242,26 +286,23 @@ export async function getPublicWaterPoints() {
 }
 
 // ======================================================
-// USER: Mengirim kontribusi titik air
+// USER: MENGIRIM KONTRIBUSI TITIK AIR
 // ======================================================
 
-export async function submitWaterPointContribution(input, contributionId = null) {
+export async function submitWaterPointContribution(input, perbaikiId = null) {
   const { supabase, user } = await getAuthenticatedClient();
 
-  const validation = validateContributionPayload(input);
-  if (!validation.valid) {
-    const error = new Error(validation.errors.join(" "));
-    error.status = 422;
-    error.code = "CONTRIBUTION_VALIDATION_FAILED";
-    throw error;
+  if (!input || typeof input !== "object") {
+    throw new Error("Data kontribusi tidak valid.");
   }
 
-  // Gunakan payload hasil validasi agar Server Action dan Route Handler
-  // menerapkan kontrak field serta aturan validasi yang sama.
-  input = validation.value;
   const contributionType = input.contribution_type;
 
-  if (!["new_point", "update_point"].includes(contributionType)) {
+  if (
+    !["new_point", "update_point"].includes(
+      contributionType
+    )
+  ) {
     throw new Error("Jenis kontribusi tidak valid.");
   }
 
@@ -315,8 +356,13 @@ export async function submitWaterPointContribution(input, contributionId = null)
     );
   }
 
-  const parsedLatitude = hasLatitude ? Number(latitude) : null;
-  const parsedLongitude = hasLongitude ? Number(longitude) : null;
+  const parsedLatitude = hasLatitude
+    ? Number(latitude)
+    : null;
+
+  const parsedLongitude = hasLongitude
+    ? Number(longitude)
+    : null;
 
   if (
     hasLatitude &&
@@ -332,20 +378,6 @@ export async function submitWaterPointContribution(input, contributionId = null)
     throw new Error("Koordinat tidak valid.");
   }
 
-  const proposedAvailability =
-    input.proposed_availability_status || null;
-
-  if (
-    proposedAvailability !== null &&
-    !ALLOWED_AVAILABILITY_STATUSES.includes(
-      proposedAvailability
-    )
-  ) {
-    throw new Error(
-      "Status ketersediaan yang diusulkan tidak valid."
-    );
-  }
-
   const payload = {
     contributor_user_id: user.id,
 
@@ -357,29 +389,40 @@ export async function submitWaterPointContribution(input, contributionId = null)
     contribution_type: contributionType,
 
     proposed_point_name: pointName || null,
-    proposed_water_source_type: sourceType || null,
-    proposed_description: input.proposed_description || null,
 
-    proposed_province_id: input.proposed_province_id
-      ? Number(input.proposed_province_id)
-      : null,
+    proposed_water_source_type:
+      sourceType || null,
 
-    proposed_city_regency_id: input.proposed_city_regency_id
-      ? Number(input.proposed_city_regency_id)
-      : null,
+    proposed_description:
+      input.proposed_description || null,
 
-    proposed_district_id: input.proposed_district_id
-      ? Number(input.proposed_district_id)
-      : null,
+    proposed_province_id:
+      input.proposed_province_id
+        ? Number(input.proposed_province_id)
+        : null,
 
-    proposed_village: input.proposed_village || null,
+    proposed_city_regency_id:
+      input.proposed_city_regency_id
+        ? Number(input.proposed_city_regency_id)
+        : null,
+
+    proposed_district_id:
+      input.proposed_district_id
+        ? Number(input.proposed_district_id)
+        : null,
+
+    proposed_village:
+      input.proposed_village || null,
+
     proposed_address_detail:
       input.proposed_address_detail || null,
 
     proposed_latitude: parsedLatitude,
+
     proposed_longitude: parsedLongitude,
 
-    proposed_availability_status: proposedAvailability,
+    proposed_availability_status:
+      input.proposed_availability_status || null,
 
     proposed_access_information:
       input.proposed_access_information || null,
@@ -387,8 +430,11 @@ export async function submitWaterPointContribution(input, contributionId = null)
     proposed_opening_hours:
       input.proposed_opening_hours || null,
 
-    evidence_url: input.evidence_url || null,
-    notes: input.notes || null,
+    evidence_url:
+      input.evidence_url || null,
+
+    notes:
+      input.notes || null,
   };
 
   if (
@@ -401,50 +447,45 @@ export async function submitWaterPointContribution(input, contributionId = null)
     throw new Error("ID titik air tidak valid.");
   }
 
-  if (contributionId != null) {
-    const id = Number(contributionId);
+  // Revisi harus memperbarui record kontribusi yang sama, bukan INSERT baru.
+  if (perbaikiId !== null && perbaikiId !== undefined) {
+    const id = Number(perbaikiId);
     if (!Number.isSafeInteger(id) || id <= 0) {
-      const error = new Error("ID kontribusi tidak valid.");
-      error.status = 400;
-      error.code = "INVALID_ID";
-      throw error;
+      throw new Error("ID kontribusi untuk perbaikan tidak valid.");
     }
 
-    const { data: existing, error: findError } = await supabase
+    const { data: existing, error: fetchError } = await supabase
       .from("water_point_contributions")
-      .select("contribution_id, status")
+      .select("contribution_id, status, contributor_user_id")
       .eq("contribution_id", id)
       .eq("contributor_user_id", user.id)
       .maybeSingle();
-    throwIfError(findError);
-    if (!existing) {
-      const error = new Error("Kontribusi tidak ditemukan.");
-      error.status = 404;
-      error.code = "NOT_FOUND";
-      throw error;
-    }
+
+    throwIfError(fetchError);
+    if (!existing) throw new Error("Kontribusi tidak ditemukan atau bukan milik Anda.");
     if (existing.status !== "needs_revision") {
-      const error = new Error("Kontribusi hanya dapat diperbarui ketika statusnya Perlu Perbaikan.");
-      error.status = 409;
-      error.code = "CONTRIBUTION_NOT_EDITABLE";
-      throw error;
+      throw new Error("Kontribusi ini tidak sedang menunggu perbaikan.");
     }
 
     const { data, error } = await supabase
       .from("water_point_contributions")
-      .update({ ...payload, status: "pending", admin_review_note: null, admin_review_guidance: null, updated_at: new Date().toISOString() })
+      .update({
+        ...payload,
+        status: "pending",
+        submitted_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        admin_review_note: null,
+        admin_review_guidance: null,
+        reviewed_by: null,
+        reviewed_at: null,
+      })
       .eq("contribution_id", id)
       .eq("contributor_user_id", user.id)
       .eq("status", "needs_revision")
       .select("*")
-      .maybeSingle();
+      .single();
+
     throwIfError(error);
-    if (!data) {
-      const conflict = new Error("Kontribusi berubah atau tidak lagi dapat diperbarui. Muat ulang halaman.");
-      conflict.status = 409;
-      conflict.code = "CONTRIBUTION_UPDATE_CONFLICT";
-      throw conflict;
-    }
     return data;
   }
 
@@ -459,11 +500,12 @@ export async function submitWaterPointContribution(input, contributionId = null)
 }
 
 // ======================================================
-// USER: Melihat kontribusi milik sendiri
+// USER: MELIHAT KONTRIBUSI MILIK SENDIRI
 // ======================================================
 
 export async function getMyWaterPointContributions() {
-  const { supabase, user } = await getAuthenticatedClient();
+  const { supabase, user } =
+    await getAuthenticatedClient();
 
   const { data: contributions, error } = await supabase
     .from("water_point_contributions")
@@ -481,49 +523,35 @@ export async function getMyWaterPointContributions() {
     (item) => item.contribution_id
   );
 
-  const { data: reviews, error: reviewError } = await supabase
-    .from("contribution_reviews")
-    .select("*")
-    .in("contribution_id", contributionIds)
-    .order("reviewed_at", { ascending: false })
-    .order("review_id", { ascending: false });
-
-  throwIfError(reviewError);
-
-  const latestReviewByContribution = new Map();
-
-  for (const review of reviews || []) {
-    if (
-      !latestReviewByContribution.has(review.contribution_id)
-    ) {
-      latestReviewByContribution.set(
-        review.contribution_id,
-        review
-      );
-    }
-  }
+  const latestReviewByContribution =
+    await getLatestReviews(
+      supabase,
+      contributionIds
+    );
 
   return contributions.map((contribution) => {
-    const latestReview = latestReviewByContribution.get(
-      contribution.contribution_id
-    );
+    const latestReview =
+      latestReviewByContribution.get(
+        contribution.contribution_id
+      );
+
+    const review = normalizeReview(latestReview);
 
     return {
       ...contribution,
-      review: latestReview || null,
-      // Kolom status pada kontribusi adalah status terkini. Review lama tetap
-      // menjadi histori, tetapi tidak boleh menimpa status pending setelah user
-      // memperbaiki dan mengirim ulang kontribusinya.
-      status:
-        contribution.status ||
-        latestReview?.review_status ||
-        "pending",
+
+      review,
+
+      status: getReviewStatus(
+        contribution,
+        review
+      ),
     };
   });
 }
 
 // ======================================================
-// ADMIN: Melihat seluruh kontribusi
+// ADMIN: MELIHAT SELURUH KONTRIBUSI
 // ======================================================
 
 export async function getAdminWaterPointContributions() {
@@ -531,7 +559,14 @@ export async function getAdminWaterPointContributions() {
 
   const { data: contributions, error } = await supabase
     .from("water_point_contributions")
-    .select("*")
+    .select(`
+      *,
+      contributor:users!fk_contribution_user (
+        user_id,
+        full_name,
+        email
+      )
+    `)
     .order("submitted_at", { ascending: false });
 
   throwIfError(error);
@@ -544,81 +579,27 @@ export async function getAdminWaterPointContributions() {
     (item) => item.contribution_id
   );
 
-  const contributorIds = [...new Set(
-    contributions.map((item) => item.contributor_user_id).filter(Boolean)
-  )];
-  let contributorNameById = new Map();
-
-  if (contributorIds.length > 0) {
-    const { data: profiles, error: profileError } = await supabase
-      .from("users")
-      .select("user_id, full_name")
-      .in("user_id", contributorIds);
-
-    throwIfError(profileError);
-    contributorNameById = new Map(
-      (profiles || []).map((profile) => [profile.user_id, profile.full_name])
+  const latestReviewByContribution =
+    await getLatestReviews(
+      supabase,
+      contributionIds
     );
-  }
-
-  const provinceIds = [...new Set(contributions.map((item) => item.proposed_province_id).filter(Boolean))];
-  const regencyIds = [...new Set(contributions.map((item) => item.proposed_city_regency_id).filter(Boolean))];
-  const districtIds = [...new Set(contributions.map((item) => item.proposed_district_id).filter(Boolean))];
-  const [provinceResult, regencyResult, districtResult] = await Promise.all([
-    provinceIds.length ? supabase.from("provinces").select("province_id, province_name").in("province_id", provinceIds) : Promise.resolve({ data: [], error: null }),
-    regencyIds.length ? supabase.from("city_regencies").select("city_regency_id, city_regency_name").in("city_regency_id", regencyIds) : Promise.resolve({ data: [], error: null }),
-    districtIds.length ? supabase.from("districts").select("district_id, district_name").in("district_id", districtIds) : Promise.resolve({ data: [], error: null }),
-  ]);
-  throwIfError(provinceResult.error);
-  throwIfError(regencyResult.error);
-  throwIfError(districtResult.error);
-
-  const provinceNameById = new Map((provinceResult.data || []).map((item) => [Number(item.province_id), item.province_name]));
-  const regencyNameById = new Map((regencyResult.data || []).map((item) => [Number(item.city_regency_id), item.city_regency_name]));
-  const districtNameById = new Map((districtResult.data || []).map((item) => [Number(item.district_id), item.district_name]));
-
-  const { data: reviews, error: reviewError } = await supabase
-    .from("contribution_reviews")
-    .select("*")
-    .in("contribution_id", contributionIds)
-    .order("reviewed_at", { ascending: false })
-    .order("review_id", { ascending: false });
-
-  throwIfError(reviewError);
-
-  const latestReviewByContribution = new Map();
-
-  for (const review of reviews || []) {
-    if (
-      !latestReviewByContribution.has(review.contribution_id)
-    ) {
-      latestReviewByContribution.set(
-        review.contribution_id,
-        review
-      );
-    }
-  }
 
   return contributions.map((contribution) => {
-    const latestReview = latestReviewByContribution.get(
-      contribution.contribution_id
-    );
+    const latestReview =
+      latestReviewByContribution.get(
+        contribution.contribution_id
+      );
 
     return mapContributionToUI(
       contribution,
-      latestReview,
-      contributorNameById.get(contribution.contributor_user_id) || null,
-      {
-        provinceName: provinceNameById.get(Number(contribution.proposed_province_id)),
-        regencyName: regencyNameById.get(Number(contribution.proposed_city_regency_id)),
-        districtName: districtNameById.get(Number(contribution.proposed_district_id)),
-      }
+      latestReview
     );
   });
 }
 
 // ======================================================
-// ADMIN: Menyetujui, menolak, atau meminta revisi
+// ADMIN: MENYETUJUI, MENOLAK, ATAU MEMINTA REVISI
 // ======================================================
 
 export async function reviewWaterPointContribution({
@@ -635,73 +616,29 @@ export async function reviewWaterPointContribution({
     throw new Error("ID kontribusi tidak valid.");
   }
 
-  if (!ALLOWED_REVIEW_STATUSES.includes(reviewStatus)) {
+  if (
+    !["approved", "rejected", "needs_revision"].includes(
+      reviewStatus
+    )
+  ) {
     throw new Error("Status review tidak valid.");
   }
 
-  if (
-    availabilityStatus !== null &&
-    !ALLOWED_AVAILABILITY_STATUSES.includes(
-      availabilityStatus
-    )
-  ) {
-    throw new Error("Status ketersediaan tidak valid.");
+  if (reviewStatus === "approved" && !["available", "limited", "unavailable", "unknown"].includes(availabilityStatus)) {
+    throw new Error("Status ketersediaan wajib dipilih saat menyetujui kontribusi.");
   }
 
-  if (
-    reviewStatus === "approved" &&
-    availabilityStatus === null
-  ) {
-    throw new Error(
-      "Pilih status ketersediaan sebelum menyetujui kontribusi."
-    );
-  }
-
-  // RPC tetap bertanggung jawab atas proses verifikasi kontribusi.
   const { data, error } = await supabase.rpc(
     "review_water_point_contribution",
     {
       p_contribution_id: id,
       p_review_status: reviewStatus,
       p_review_notes: reviewNotes?.trim() || null,
+      p_availability_status: reviewStatus === "approved" ? availabilityStatus : null,
     }
   );
 
   throwIfError(error);
-
-  // Status ketersediaan hanya diterapkan ketika kontribusi disetujui.
-  // Status pending/revisi/ditolak tidak mengubah data titik air.
-  if (reviewStatus === "approved") {
-    const { data: contribution, error: contributionError } =
-      await supabase
-        .from("water_point_contributions")
-        .select("water_point_id")
-        .eq("contribution_id", id)
-        .single();
-
-    throwIfError(contributionError);
-
-    const waterPointId = Number(contribution?.water_point_id);
-
-    if (
-      !Number.isSafeInteger(waterPointId) ||
-      waterPointId <= 0
-    ) {
-      throw new Error(
-        "Kontribusi sudah diproses, tetapi ID titik air hasil persetujuan tidak ditemukan. Periksa fungsi RPC review_water_point_contribution."
-      );
-    }
-
-    const { error: updateError } = await supabase
-      .from("water_points")
-      .update({
-        availability_status: availabilityStatus,
-        last_status_checked_at: new Date().toISOString(),
-      })
-      .eq("water_point_id", waterPointId);
-
-    throwIfError(updateError);
-  }
 
   return data;
 }

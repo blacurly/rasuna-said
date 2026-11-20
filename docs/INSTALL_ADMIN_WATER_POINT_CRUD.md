@@ -11,7 +11,7 @@ Salin file/folder dalam ZIP patch ke root repository `aira-website`, merge folde
 Route/service menggunakan `requireApiAdmin()` yang memeriksa sesi, role admin, status aktif, dan RPC `is_aira_admin`. Jangan bypass atau mengganti pemeriksaan ini.
 
 ## DELETE
-DELETE melakukan soft-delete (set `is_active=false`) bukan penghapusan permanen.
+DELETE melakukan soft-delete/deaktivasi (set `is_active=false`), bukan penghapusan permanen. Service API dan Server Action harus menggunakan operasi UPDATE ini.
 
 ## Uji setelah menyalin
 1. `npm run lint`
