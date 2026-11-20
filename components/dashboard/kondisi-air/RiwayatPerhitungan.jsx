@@ -45,12 +45,12 @@ export default function RiwayatPerhitungan({ riwayat, baru = false }) {
   }
 
   async function hapusRiwayat(r) {
-    const yakin = window.confirm("Hapus riwayat perhitungan ini? Data yang sudah memiliki rekomendasi atau interaksi Assistant tidak dapat dihapus.");
+    const yakin = window.confirm("Hapus riwayat perhitungan ini secara permanen? Rekomendasi dan interaksi Assistant yang terhubung langsung ke asesmen ini juga akan dihapus. Data profil keluarga tidak akan dihapus.");
     if (!yakin) return;
     const response = await fetch(`/api/water-assessments/${r.id}`, { method: "DELETE" });
     const result = await response.json().catch(() => null);
     if (!response.ok || !result?.success) {
-      window.alert(result?.message || "Riwayat belum dapat dihapus. Coba muat ulang halaman.");
+      window.alert(result?.message || "Riwayat belum dapat dihapus. Coba muat ulang halaman atau hubungi pengelola jika masalah berlanjut.");
       return;
     }
     router.refresh();

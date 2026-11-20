@@ -129,13 +129,21 @@ Table water_point_contributions {
   reviewed_at timestamptz
 }
 
-Table contribution_reviews {
+Table water_point_contribution_reviews {
   review_id bigint [pk, increment]
   contribution_id bigint
-  reviewer_user_id uuid
-  review_status varchar
-  review_notes text
+  reviewed_by uuid
+  previous_status varchar
+  new_status varchar
+  review_note text
   reviewed_at timestamptz
+  updated_by uuid
+  updated_at timestamptz
+  edit_reason text
+  is_archived boolean
+  archived_by uuid
+  archived_at timestamptz
+  archive_reason text
 }
 
 Table assistant_interactions {
@@ -170,8 +178,8 @@ Ref: guides.guide_id - assessment_recommendations.guide_id
 Ref: users.user_id - water_points.verified_by_user_id
 Ref: users.user_id - water_point_contributions.contributor_user_id
 Ref: water_points.water_point_id - water_point_contributions.water_point_id
-Ref: water_point_contributions.contribution_id - contribution_reviews.contribution_id
-Ref: users.user_id - contribution_reviews.reviewer_user_id
+Ref: water_point_contributions.contribution_id - water_point_contribution_reviews.contribution_id
+Ref: users.user_id - water_point_contribution_reviews.reviewed_by
 Ref: users.user_id - assistant_interactions.user_id
 Ref: households.household_id - assistant_interactions.household_id
 Ref: water_assessments.assessment_id - assistant_interactions.assessment_id

@@ -1,5 +1,5 @@
 import { apiSuccess, handleApiError, readJson } from "@/lib/api/response";
-import { getAdminWaterPoint, updateAdminWaterPoint, deactivateAdminWaterPoint } from "@/services/waterPointAdminService";
+import { getAdminWaterPoint, updateAdminWaterPoint, deleteAdminWaterPoint } from "@/services/waterPointAdminService";
 
 function validId(id) { return /^\d+$/.test(String(id)) && Number(id) > 0; }
 export async function GET(_request, { params }) {
@@ -11,6 +11,6 @@ export async function PATCH(request, { params }) {
   catch (error) { return handleApiError(error, "Titik air gagal diperbarui."); }
 }
 export async function DELETE(_request, { params }) {
-  try { const { id } = await params; if (!validId(id)) return handleApiError(Object.assign(new Error("ID titik air tidak valid."), { status: 400, code: "INVALID_ID" })); return apiSuccess(await deactivateAdminWaterPoint(id), { message: "Titik air berhasil dinonaktifkan." }); }
-  catch (error) { return handleApiError(error, "Titik air gagal dinonaktifkan."); }
+  try { const { id } = await params; if (!validId(id)) return handleApiError(Object.assign(new Error("ID titik air tidak valid."), { status: 400, code: "INVALID_ID" })); return apiSuccess(await deleteAdminWaterPoint(id), { message: "Titik air berhasil dinonaktifkan dari direktori." }); }
+  catch (error) { return handleApiError(error, "Titik air gagal dihapus."); }
 }

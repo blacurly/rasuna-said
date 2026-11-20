@@ -9,7 +9,7 @@ Dokumen ini disusun dari export definisi tabel yang diberikan pada 20 November 2
 | `households` | `household_members`, `water_assessments`, `assistant_interactions` | Jangan menghapus rumah tangga jika masih memiliki data turunan. Endpoint DELETE mengembalikan HTTP 409 jika dependensi masih ada. |
 | `water_assessments` | `assessment_recommendations`, `assistant_interactions` | Jangan menghapus asesmen jika rekomendasi atau interaksi Assistant masih terhubung. Endpoint DELETE mengembalikan HTTP 409. |
 | `water_point_contributions` | `contribution_reviews`, `water_point_contribution_reviews` | Pembatalan hanya diizinkan saat status `pending` dan belum ada riwayat review. |
-| `water_points` | `water_point_contributions` | Penghapusan titik air tidak boleh memutus kontribusi dan riwayat verifikasi. Gunakan penonaktifan (`is_active=false`) untuk pengelolaan admin. |
+| `water_points` | `water_point_contributions` | Hard delete titik air yang dipilih admin harus mempertahankan histori kontribusi: `water_point_contributions.water_point_id` menjadi NULL dengan FK `ON DELETE SET NULL`; `contribution_reviews` tetap melekat pada contribution. Jangan cascade menghapus kontribusi/review. |
 
 ## Batasan yang harus diverifikasi di Supabase
 
@@ -31,3 +31,7 @@ Dokumen ini disusun dari export definisi tabel yang diberikan pada 20 November 2
 ## Status
 
 File ini adalah audit dokumentasi, bukan migration yang dieksekusi. Tidak ada perubahan langsung pada database Supabase. Penerapan perubahan kebijakan RLS harus menunggu export policies/functions aktual agar tidak menimpa aturan keamanan yang sudah berjalan.
+
+## Current review history and assessment delete
+
+Review history is stored in `water_point_contribution_reviews` (the legacy `contribution_reviews` table is not the active table). Assessment deletion is handled by the ownership-checked database function `delete_my_water_assessment`; it deletes direct assessment recommendations and Assistant interaction rows in the same transaction. Admin water-point removal uses soft deactivation (`is_active=false`). Verify these assumptions against the live schema before applying `database/AIRA_BACKEND_ALIGNMENT.sql`.

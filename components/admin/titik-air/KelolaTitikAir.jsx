@@ -10,6 +10,7 @@ import PanelEditTitikAir, {
   KETERSEDIAAN,
 } from "@/components/admin/titik-air/PanelEditTitikAir";
 import { Toast } from "@/components/admin/titik-air/PesanUi";
+
 import {
   kartuUtama,
   kolomForm,
@@ -19,13 +20,16 @@ import {
   tombolHapus,
   tombolUtama,
 } from "@/components/admin/titik-air/titikAirStyles";
+
 import {
   formatAvailability,
   formatCategory,
 } from "@/components/admin/verifikasi-titik-air/formatters";
+
 import { AvailabilityBadge } from "@/components/StatusBadge";
+
 import {
-  nonaktifkanTitikAirAction,
+  hapusTitikAirAction,
   simpanTitikAirAction as simpanBawaan,
 } from "@/app/actions/admin-titik-air";
 
@@ -238,21 +242,19 @@ export default function KelolaTitikAir({
       return;
     }
 
+  const hapusTitikAir = async (item) => {
+    const konfirmasi = window.confirm(`Hapus permanen titik air "${item.name || "Tanpa nama"}" dari database? Riwayat kontribusi/review akan tetap dipertahankan dan relasinya dilepas.`);
+    if (!konfirmasi) return;
+    setPesan(null);
+    setSedangMenghapusId(item.id);
     try {
-      const hasil = await nonaktifkanTitikAirAction(id);
-      if (!hasil?.success) {
-        throw new Error(hasil?.message || "Titik air gagal dinonaktifkan.");
-      }
-
-      setTitik((items) => items.filter((t) => t.id !== id));
-      if (editId === id) setEditId(null);
-      setHapusId(null);
-      setPesan(`Titik air "${name}" dinonaktifkan dari daftar aktif.`);
+      const hasil = await hapusTitikAirAction(item.id);
+      if (!hasil?.success) throw new Error(hasil?.message || "Titik air gagal dihapus.");
+      setTitik((items) => items.filter((t) => t.id !== item.id));
+      if (editId === item.id) setEditId(null);
+      setPesan({ type: "success", text: hasil.message || "Titik air berhasil dihapus dari database." });
     } catch (error) {
-      console.error("Gagal menonaktifkan titik air:", error);
-      setGalatHapus(
-        error?.message || "Gagal menonaktifkan titik air. Daftar tidak diubah."
-      );
+      setPesan({ type: "error", text: error?.message || "Gagal menghapus titik air. Daftar tidak diubah." });
     } finally {
       setSedangMenghapus(false);
     }
@@ -387,25 +389,10 @@ export default function KelolaTitikAir({
                   </p>
                 </td>
 
-                <td className={tdTabel}>
-                  <div className="flex flex-col items-end gap-2">
-                    <button
-                      type="button"
-                      onClick={() => bukaEdit(t.id)}
-                      aria-label={`Edit ${t.name}`}
-                      className={tombolEdit}
-                    >
-                      <Pencil className="size-4" /> Edit
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => bukaHapus(t.id)}
-                      disabled={sedangHapusBaris(t.id)}
-                      aria-label={`Hapus ${t.name}`}
-                      className={tombolHapus}
-                    >
-                      {tombolHapusIsi(t)}
-                    </button>
+                <td className={td}>
+                  <div className="flex justify-end gap-2">
+                    <TombolEdit onClick={() => setEditId(t.id)} />
+                    <button type="button" disabled={sedangMenghapusId === t.id} onClick={() => hapusTitikAir(t)} aria-label={`Hapus ${t.name}`} title="Hapus titik air secara permanen" className="inline-flex min-w-10 items-center justify-center gap-2 rounded-full border border-red-200 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"><Trash2 className="size-4" />{sedangMenghapusId === t.id ? "..." : "Hapus"}</button>
                   </div>
                 </td>
               </tr>
@@ -441,25 +428,8 @@ export default function KelolaTitikAir({
                 {t.updated || "Belum ada informasi pembaruan"}
               </p>
 
-              <div className="mt-4 flex gap-3">
-                <button
-                  type="button"
-                  onClick={() => bukaEdit(t.id)}
-                  aria-label={`Edit ${t.name}`}
-                  className={`${tombolEdit} w-full! flex-1`}
-                >
-                  <Pencil className="size-4" /> Edit
-                </button>
-                <button
-                  type="button"
-                  onClick={() => bukaHapus(t.id)}
-                  disabled={sedangHapusBaris(t.id)}
-                  aria-label={`Hapus ${t.name}`}
-                  className={`${tombolHapus} w-full! flex-1`}
-                >
-                  {tombolHapusIsi(t)}
-                </button>
-              </div>
+              <TombolEdit onClick={() => setEditId(t.id)} penuh />
+              <button type="button" disabled={sedangMenghapusId === t.id} onClick={() => hapusTitikAir(t)} className="mt-2 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-full border border-red-200 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"><Trash2 className="size-4" />{sedangMenghapusId === t.id ? "Menghapus..." : "Hapus titik air"}</button>
             </li>
           ))}
         </ul>

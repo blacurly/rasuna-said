@@ -3,10 +3,6 @@ import { apiSuccess, apiError, readJson, handleApiError } from "@/lib/api/respon
 
 const ASSESSMENT_SELECT = `assessment_id, household_id, available_water_liters, daily_need_liters, estimated_duration_days, water_condition, crisis_mode, assessment_notes, assessed_at, input_snapshot, assessment_recommendations(recommendation_id, recommendation_title, recommendation_detail, priority, action_status)`;
 
-async function ownedAssessment(supabase, userId, assessmentId) {
-  return supabase.from("water_assessments").select("assessment_id").eq("assessment_id", assessmentId).eq("assessed_by_user_id", userId).maybeSingle();
-}
-
 export async function GET(_request, { params }) {
   try {
     const { id } = await params;
@@ -43,19 +39,15 @@ export async function DELETE(_request, { params }) {
     const { id } = await params;
     const assessmentId = Number(id);
     if (!Number.isSafeInteger(assessmentId) || assessmentId <= 0) return apiError("ID asesmen tidak valid.", { status: 400, code: "INVALID_ID" });
-    const { supabase, user } = await requireApiUser();
-    const { data: assessment, error: findError } = await ownedAssessment(supabase, user.id, assessmentId);
-    if (findError) throw findError;
-    if (!assessment) return apiError("Riwayat asesmen tidak ditemukan.", { status: 404, code: "NOT_FOUND" });
-    const checks = await Promise.all([
-      supabase.from("assessment_recommendations").select("recommendation_id", { count: "exact", head: true }).eq("assessment_id", assessmentId),
-      supabase.from("assistant_interactions").select("interaction_id", { count: "exact", head: true }).eq("assessment_id", assessmentId),
-    ]);
-    const failed = checks.find((item) => item.error);
-    if (failed) throw failed.error;
-    if (checks.some((item) => (item.count || 0) > 0)) return apiError("Riwayat tidak dapat dihapus karena sudah memiliki rekomendasi atau interaksi Assistant terkait.", { status: 409, code: "ASSESSMENT_HAS_DEPENDENCIES" });
-    const { error } = await supabase.from("water_assessments").delete().eq("assessment_id", assessmentId).eq("assessed_by_user_id", user.id);
+    const { supabase } = await requireApiUser();
+
+    // RPC SECURITY DEFINER memeriksa auth.uid() dan menghapus data dependen
+    // serta assessment dalam satu transaksi. Tidak memakai service-role client.
+    const { data, error } = await supabase.rpc("delete_my_water_assessment", {
+      p_assessment_id: assessmentId,
+    });
     if (error) throw error;
-    return apiSuccess({ assessment_id: assessmentId }, { message: "Riwayat asesmen berhasil dihapus." });
+    if (!data?.success) return apiError(data?.message || "Riwayat asesmen tidak dapat dihapus.", { status: 404, code: "NOT_FOUND" });
+    return apiSuccess({ assessment_id: assessmentId }, { message: "Riwayat asesmen dan data terkait berhasil dihapus." });
   } catch (error) { return handleApiError(error, "Riwayat asesmen gagal dihapus."); }
 }
