@@ -1,184 +1,246 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
-import {
-  Droplets,
-  Pencil,
-  Search,
-  Plus,
-  Trash2,
-} from "lucide-react";
+import { useMemo, useState } from "react";
+import { Pencil, Plus, Search, Trash2 } from "lucide-react";
 
+import AdminPageHeader from "@/components/admin/AdminPageHeader";
+import DeleteDialog from "@/components/admin/titik-air/DeleteDialog";
+import FormTambahTitikAir from "@/components/admin/titik-air/FormTambahTitikAir";
 import PanelEditTitikAir, {
   KETERSEDIAAN,
 } from "@/components/admin/titik-air/PanelEditTitikAir";
-
-import FormTambahTitikAir from "@/components/admin/titik-air/FormTambahTitikAir";
-import { hapusTitikAirAction } from "@/app/actions/admin-titik-air";
-
-import AdminPageHeader from "@/components/admin/AdminPageHeader";
-
-import { formatCategory } from "@/components/admin/verifikasi-titik-air/formatters";
+import { Toast } from "@/components/admin/titik-air/PesanUi";
 
 import {
-  adminCard,
-  adminCardPad,
-  adminTh,
-  adminBtnOutline,
-  adminInput,
-} from "@/components/admin/adminStyles";
+  kartuUtama,
+  kolomForm,
+  tdTabel,
+  thTabel,
+  tombolEdit,
+  tombolHapus,
+  tombolUtama,
+} from "@/components/admin/titik-air/titikAirStyles";
 
-const td = "min-w-0 px-3 py-4 align-middle";
+import {
+  formatAvailability,
+  formatCategory,
+} from "@/components/admin/verifikasi-titik-air/formatters";
 
-const AVAIL_STYLE = {
-  Tersedia: "bg-[#C8E9DF] text-[#286B59]",
-  Terbatas: "bg-[#FCE8B5] text-[#87651D]",
-  "Tidak Tersedia": "bg-[#FCE3DC] text-[#A94D37]",
-  "Belum Diketahui": "bg-[#E9ECEC] text-[#536267]",
-};
+import { AvailabilityBadge } from "@/components/StatusBadge";
 
-function AvailabilityChip({ v }) {
-  const label = v || "Belum Diketahui";
+import {
+  hapusTitikAirAction,
+  simpanTitikAirAction as simpanBawaan,
+} from "@/app/actions/admin-titik-air";
 
-  return (
-    <span
-      className={`inline-flex w-fit items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium leading-none ${
-        AVAIL_STYLE[label] || AVAIL_STYLE["Belum Diketahui"]
-      }`}
-    >
-      <Droplets size={13} className="shrink-0" />
-      {label}
-    </span>
-  );
-}
+// Baris "Pratinjau:" (tombol-tombol state) ikut tampil di desain Figma Make.
+// Itu alat bantu desain. Ubah menjadi false untuk menyembunyikannya saat rilis.
+const TAMPILKAN_PRATINJAU = true;
 
-function TombolEdit({ onClick, penuh = false }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`${adminBtnOutline} min-w-22 ${
-        penuh ? "mt-4 w-full" : ""
-      }`}
-    >
-      <Pencil className="size-4" />
-      Edit
-    </button>
-  );
-}
+const PRATINJAU = [
+  { id: "edit", label: "Edit" },
+  { id: "edit-saving", label: "Edit menyimpan" },
+  { id: "edit-error", label: "Edit galat" },
+  { id: "add", label: "Tambah" },
+  { id: "add-invalid", label: "Tambah validasi" },
+  { id: "add-ok", label: "Tambah berhasil" },
+  { id: "delete", label: "Hapus" },
+  { id: "delete-loading", label: "Hapus memuat" },
+];
+
+const tunggu = (ms) => new Promise((selesai) => setTimeout(selesai, ms));
 
 export default function KelolaTitikAir({
   awal = [],
-  simpanTitikAirAction,
+  simpanTitikAirAction, // opsional: kalau tidak diberikan, memakai action bawaan
 }) {
   const [titik, setTitik] = useState(Array.isArray(awal) ? awal : []);
 
   const [kataKunci, setKataKunci] = useState("");
   const [filter, setFilter] = useState("Semua");
 
+  // Modal mana yang sedang terbuka
   const [editId, setEditId] = useState(null);
   const [tambahTerbuka, setTambahTerbuka] = useState(false);
+  const [hapusId, setHapusId] = useState(null);
 
-  const [pesan, setPesan] = useState(null);
+  // Status proses ASLI (bukan pratinjau)
   const [sedangMenyimpan, setSedangMenyimpan] = useState(false);
-  const [sedangMenghapusId, setSedangMenghapusId] = useState(null);
+  const [sedangMenghapus, setSedangMenghapus] = useState(false);
+  const [galatHapus, setGalatHapus] = useState("");
 
-  const dipilih = useMemo(
-    () => titik.find((t) => t.id === editId) ?? null,
-    [titik, editId]
-  );
+  const [pesan, setPesan] = useState(""); // pesan sukses (Toast)
+  const [pratinjau, setPratinjau] = useState(""); // state pratinjau aktif, "" = mode normal
+  const [kunciForm, setKunciForm] = useState(0); // dinaikkan agar modal dibuat ulang dari awal
 
-  const tutupPanel = useCallback(() => {
-    if (sedangMenyimpan) return;
-    setEditId(null);
-  }, [sedangMenyimpan]);
+  // Tampilan "sedang memproses" = proses asli ATAU state pratinjau.
+  const menyimpanTampil = sedangMenyimpan || pratinjau === "edit-saving";
+  const menghapusTampil = sedangMenghapus || pratinjau === "delete-loading";
 
+  const itemEdit = titik.find((t) => t.id === editId) ?? null;
+  const itemHapus = titik.find((t) => t.id === hapusId) ?? null;
+
+  // Daftar yang tampil setelah pencarian + filter ketersediaan.
   const daftar = useMemo(() => {
-    const keyword = kataKunci.trim().toLowerCase();
+    const kunci = kataKunci.trim().toLowerCase();
 
     return titik.filter((t) => {
       const cocokFilter =
-        filter === "Semua" ||
-        (t.availability || "Belum Diketahui") === filter;
+        filter === "Semua" || formatAvailability(t.availability) === filter;
 
-      const teksPencarian = [
-        t.name,
-        t.area,
-        t.type,
-        t.address,
-      ]
+      const teksCari = [t.name, t.area, t.type, t.address]
         .filter(Boolean)
         .join(" ")
         .toLowerCase();
 
-      return cocokFilter && teksPencarian.includes(keyword);
+      return cocokFilter && teksCari.includes(kunci);
     });
   }, [titik, filter, kataKunci]);
 
+  // ---------- Membuka / menutup modal ----------
+
+  const tutupSemua = () => {
+    setEditId(null);
+    setTambahTerbuka(false);
+    setHapusId(null);
+    setSedangMenyimpan(false);
+    setSedangMenghapus(false);
+    setGalatHapus("");
+  };
+
+  const bukaEdit = (id) => {
+    setPesan("");
+    setPratinjau("");
+    setKunciForm((k) => k + 1);
+    setEditId(id);
+  };
+
+  const bukaTambah = () => {
+    tutupSemua();
+    setPesan("");
+    setPratinjau("");
+    setKunciForm((k) => k + 1);
+    setTambahTerbuka(true);
+  };
+
+  const bukaHapus = (id) => {
+    setPesan("");
+    setPratinjau("");
+    setGalatHapus("");
+    setHapusId(id);
+  };
+
+  const tutupEdit = () => {
+    if (sedangMenyimpan) return;
+    setEditId(null);
+    setPratinjau("");
+  };
+
+  const tutupTambah = () => {
+    setTambahTerbuka(false);
+    setPratinjau("");
+  };
+
+  const tutupHapus = () => {
+    if (sedangMenghapus) return;
+    setHapusId(null);
+    setGalatHapus("");
+    setPratinjau("");
+  };
+
+  // Tombol "Pratinjau": membuka modal sesuai state yang dipilih memakai titik air pertama.
+  const bukaPratinjau = (id) => {
+    tutupSemua();
+    setPesan("");
+    setPratinjau(id);
+    setKunciForm((k) => k + 1);
+
+    const pertama = titik[0]?.id ?? null;
+    if (id.startsWith("edit")) setEditId(pertama);
+    if (id.startsWith("add")) setTambahTerbuka(true);
+    if (id.startsWith("delete")) setHapusId(pertama);
+  };
+
+  // ---------- Menyimpan perubahan (modal Edit) ----------
+
+  // Mengembalikan { success, message } agar modal bisa menampilkan galat sendiri.
   const simpan = async (id, perubahan, sumber) => {
-    setPesan(null);
+    setPesan("");
+    const item = titik.find((t) => t.id === id);
+    const namaTampil = perubahan.name || item?.name || "";
 
-    if (typeof simpanTitikAirAction !== "function") {
-      setPesan({
-        type: "error",
-        text: "Fitur penyimpanan belum terhubung ke Server Action. Perubahan belum disimpan.",
-      });
-
-      return { success: false };
+    // Mode pratinjau: HANYA simulasi. Tidak ada data asli yang diubah.
+    if (pratinjau) {
+      setSedangMenyimpan(true);
+      await tunggu(700);
+      setSedangMenyimpan(false);
+      setEditId(null);
+      setPratinjau("");
+      setPesan(
+        `Pratinjau: perubahan "${namaTampil}" disimulasikan dan tidak disimpan.`
+      );
+      return { success: true };
     }
 
+    const jalankan = simpanTitikAirAction ?? simpanBawaan;
     setSedangMenyimpan(true);
 
     try {
-      const hasil = await simpanTitikAirAction({
-        pointId: id,
-        perubahan,
-        sumber,
-      });
+      const hasil = await jalankan({ pointId: id, perubahan, sumber });
 
       if (!hasil?.success) {
-        throw new Error(
-          hasil?.message || "Perubahan titik air gagal disimpan."
-        );
+        return {
+          success: false,
+          message: hasil?.message || "Perubahan titik air gagal disimpan.",
+        };
       }
 
-      setTitik((daftarLama) =>
-        daftarLama.map((item) =>
-          item.id === id
+      setTitik((lama) =>
+        lama.map((t) =>
+          t.id === id
             ? {
-                ...item,
+                ...t,
                 ...perubahan,
                 updated: "Diperbarui baru saja",
                 updatedHoursAgo: 0,
               }
-            : item
+            : t
         )
       );
-
-      setPesan({
-        type: "success",
-        text: hasil.message || "Perubahan titik air berhasil disimpan.",
-      });
-
       setEditId(null);
-
+      setPesan(`Perubahan "${namaTampil}" tersimpan dan tampil di Navigasi Air.`);
       return { success: true };
     } catch (error) {
       console.error("Gagal menyimpan perubahan titik air:", error);
-
-      setPesan({
-        type: "error",
-        text:
+      return {
+        success: false,
+        message:
           error?.message ||
-          "Terjadi kesalahan saat menyimpan perubahan. Silakan coba lagi.",
-      });
-
-      return { success: false };
+          "Perubahan belum dapat disimpan. Periksa koneksi Anda, lalu coba lagi.",
+      };
     } finally {
       setSedangMenyimpan(false);
     }
   };
 
+  // ---------- Menghapus (menonaktifkan) titik air ----------
+
+  const konfirmasiHapus = async () => {
+    if (!itemHapus || sedangMenghapus) return;
+
+    const { id, name } = itemHapus;
+    setGalatHapus("");
+    setSedangMenghapus(true);
+
+    // Mode pratinjau: simulasi saja, titik air asli TIDAK dinonaktifkan.
+    if (pratinjau) {
+      await tunggu(800);
+      setSedangMenghapus(false);
+      setHapusId(null);
+      setPratinjau("");
+      setPesan(`Pratinjau: penghapusan "${name}" disimulasikan dan tidak dijalankan.`);
+      return;
+    }
 
   const hapusTitikAir = async (item) => {
     const konfirmasi = window.confirm(`Hapus permanen titik air "${item.name || "Tanpa nama"}" dari database? Riwayat kontribusi/review akan tetap dipertahankan dan relasinya dilepas.`);
@@ -194,76 +256,75 @@ export default function KelolaTitikAir({
     } catch (error) {
       setPesan({ type: "error", text: error?.message || "Gagal menghapus titik air. Daftar tidak diubah." });
     } finally {
-      setSedangMenghapusId(null);
+      setSedangMenghapus(false);
     }
   };
 
-  const bukaFormTambah = () => {
-    setPesan(null);
-    setTambahTerbuka(true);
-  };
+  const sedangHapusBaris = (id) => menghapusTampil && hapusId === id;
 
-  const tutupFormTambah = () => {
-    setTambahTerbuka(false);
-  };
+  // Tombol Edit & Hapus dipakai di tabel (desktop) dan kartu (HP/tablet).
+  const tombolHapusIsi = (t) =>
+    sedangHapusBaris(t.id) ? (
+      "Menghapus..."
+    ) : (
+      <>
+        <Trash2 className="size-4" /> Hapus
+      </>
+    );
 
   return (
-    <>
-      <AdminPageHeader
-        title="Kelola Titik Air"
-        description="Direktori titik air terverifikasi yang tampil di Navigasi Air. Perbarui ketersediaan dan informasi operasional berdasarkan sumber informasi yang jelas."
-      />
-
-      {/* =============================== */}
-      {/* ACTION TAMBAH TITIK AIR */}
-      {/* =============================== */}
-
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-sm text-aira-text/65">
-          Kelola data titik air dan tambahkan lokasi baru.
-        </p>
+    <div className="space-y-6">
+      {/* Judul halaman + tombol Tambah */}
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <AdminPageHeader
+          large
+          title="Kelola Titik Air"
+          description="Direktori titik air terverifikasi yang tampil di Navigasi Air. Perbarui ketersediaan dan informasi operasional berdasarkan sumber informasi yang jelas."
+        />
 
         <button
           type="button"
-          onClick={bukaFormTambah}
-          className="inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-full bg-aira-primary px-5 py-3 text-sm font-semibold text-white shadow-soft transition-colors hover:bg-aira-primary-dark sm:w-auto"
+          onClick={bukaTambah}
+          className={`${tombolUtama} inline-flex w-full items-center justify-center gap-2 sm:w-auto`}
         >
-          <Plus className="size-4" />
-          Tambah Titik Air
+          <Plus className="size-5" /> Tambah Titik Air
         </button>
       </div>
 
-      {/* FEEDBACK */}
-      {pesan && (
-        <p
-          role={pesan.type === "error" ? "alert" : "status"}
-          className={`rounded-xl border px-4 py-3 text-sm font-medium ${
-            pesan.type === "error"
-              ? "border-red-200 bg-red-50 text-red-700"
-              : "border-aira-sage bg-aira-sage/50 text-aira-primary-dark"
-          }`}
+      {/* Pratinjau state (alat bantu desain dari Figma Make) */}
+      {TAMPILKAN_PRATINJAU && (
+        <div
+          className="flex flex-wrap items-center gap-2 text-sm"
+          role="group"
+          aria-label="Pratinjau state"
         >
-          {pesan.text}
-        </p>
+          <span className="font-semibold text-aira-text/65">Pratinjau:</span>
+          {PRATINJAU.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => bukaPratinjau(p.id)}
+              className="min-h-[36px] rounded-full border border-aira-primary/20 bg-white px-3 py-1.5 font-semibold text-aira-primary hover:bg-aira-primary/10"
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
       )}
 
-      {/* =============================== */}
-      {/* DIREKTORI TITIK AIR */}
-      {/* =============================== */}
+      <Toast text={pesan} />
 
-      <section className={`${adminCard} ${adminCardPad} w-full min-w-0`}>
-        {/* SEARCH DAN FILTER */}
-        <div className="grid gap-3 md:grid-cols-[1fr_200px]">
+      {/* Kartu: pencarian + filter + tabel */}
+      <section className={kartuUtama}>
+        <div className="grid gap-3 md:grid-cols-[1fr_220px]">
           <label className="relative">
             <span className="sr-only">Cari titik air</span>
-
-            <Search className="absolute left-4 top-1/2 size-4 -translate-y-1/2 text-aira-primary" />
-
+            <Search className="absolute left-4 top-1/2 size-5 -translate-y-1/2 text-aira-primary" />
             <input
               value={kataKunci}
               onChange={(e) => setKataKunci(e.target.value)}
               placeholder="Cari nama, jenis, atau wilayah"
-              className={`${adminInput} pl-11`}
+              className={`${kolomForm} pl-12`}
             />
           </label>
 
@@ -271,10 +332,9 @@ export default function KelolaTitikAir({
             aria-label="Filter ketersediaan"
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            className={adminInput}
+            className={kolomForm}
           >
             <option value="Semua">Semua</option>
-
             {KETERSEDIAAN.map((k) => (
               <option key={k} value={k}>
                 {k}
@@ -283,25 +343,17 @@ export default function KelolaTitikAir({
           </select>
         </div>
 
-        {/* DESKTOP TABLE */}
-        <table className="mt-4 hidden w-full table-fixed border-collapse text-left lg:table">
-          <colgroup>
-            <col className="w-[32%]" />
-            <col className="w-[18%]" />
-            <col className="w-[20%]" />
-            <col className="w-[18%]" />
-            <col className="w-[12%]" />
-          </colgroup>
-
+        {/* Tabel desktop (layar >= 1280px) */}
+        <table className="mt-4 hidden w-full table-fixed text-left text-base xl:table">
           <thead>
             <tr className="border-b border-aira-primary/10">
-              <th className={adminTh}>Titik air</th>
-              <th className={adminTh}>Wilayah</th>
-              <th className={adminTh}>Ketersediaan</th>
-              <th className={adminTh}>Jam operasional</th>
-              <th className={adminTh}>
-                <span className="sr-only">Aksi</span>
+              <th className={`${thTabel} w-[24%]`}>Titik air</th>
+              <th className={`${thTabel} w-[15%]`}>Wilayah</th>
+              <th className={`${thTabel} w-[170px]`}>Ketersediaan</th>
+              <th className={`${thTabel} w-[26%] whitespace-nowrap`}>
+                Jam operasional
               </th>
+              <th className={`${thTabel} w-[136px] text-right`}>Aksi</th>
             </tr>
           </thead>
 
@@ -309,32 +361,30 @@ export default function KelolaTitikAir({
             {daftar.map((t) => (
               <tr
                 key={t.id}
-                className="border-b border-aira-primary/8 transition-colors last:border-b-0 hover:bg-aira-bg/60"
+                className="border-b border-aira-primary/5 last:border-0 hover:bg-aira-bg"
               >
-                <td className={td}>
-                  <p className="wrap-break-word text-sm font-semibold leading-snug text-aira-primary">
+                <td className={`${tdTabel} min-h-[88px]`}>
+                  <p className="font-semibold text-aira-primary wrap-break-word">
                     {t.name || "Tanpa nama"}
                   </p>
-
-                  <p className="mt-1 text-xs leading-snug text-aira-text/55">
+                  <p className="text-sm text-aira-text/65">
                     {formatCategory(t.type)}
                   </p>
                 </td>
 
-                <td className={`${td} text-sm text-aira-text/80`}>
+                <td className={`${tdTabel} wrap-break-word`}>
                   {t.area || "Wilayah belum tersedia"}
                 </td>
 
-                <td className={`${td} whitespace-nowrap`}>
-                  <AvailabilityChip v={t.availability} />
+                <td className={`${tdTabel} whitespace-nowrap`}>
+                  <AvailabilityBadge v={formatAvailability(t.availability)} />
                 </td>
 
-                <td className={td}>
-                  <p className="text-sm text-aira-text/80">
+                <td className={tdTabel}>
+                  <p className="text-aira-text/80 wrap-break-word">
                     {t.hours || "Belum diketahui"}
                   </p>
-
-                  <p className="mt-1 text-xs text-aira-text/55">
+                  <p className="text-sm text-aira-text/65">
                     {t.updated || "Belum ada informasi pembaruan"}
                   </p>
                 </td>
@@ -350,34 +400,31 @@ export default function KelolaTitikAir({
           </tbody>
         </table>
 
-        {/* MOBILE & TABLET CARD */}
-        <ul className="mt-4 space-y-3 lg:hidden">
+        {/* Kartu HP / tablet (layar < 1280px) */}
+        <ul className="mt-4 space-y-3 xl:hidden">
           {daftar.map((t) => (
             <li
               key={t.id}
-              className="rounded-xl border border-aira-primary/10 bg-white p-4"
+              className="rounded-[16px] border border-aira-primary/10 p-5"
             >
-              <p className="wrap-break-word text-sm font-semibold text-aira-primary">
+              <p className="font-semibold text-aira-primary wrap-break-word">
                 {t.name || "Tanpa nama"}
               </p>
-
-              <p className="mt-1 text-xs text-aira-text/55">
+              <p className="text-sm text-aira-text/65">
                 {formatCategory(t.type)}
               </p>
-
-              <p className="mt-2 text-xs text-aira-text/70">
+              <p className="mt-2 text-base text-aira-text/75">
                 {t.area || "Wilayah belum tersedia"}
               </p>
 
               <div className="mt-3 whitespace-nowrap">
-                <AvailabilityChip v={t.availability} />
+                <AvailabilityBadge v={formatAvailability(t.availability)} />
               </div>
 
-              <p className="mt-3 text-sm text-aira-text/80">
+              <p className="mt-3 text-base text-aira-text/80">
                 {t.hours || "Belum diketahui"}
               </p>
-
-              <p className="text-xs text-aira-text/55">
+              <p className="text-sm text-aira-text/65">
                 {t.updated || "Belum ada informasi pembaruan"}
               </p>
 
@@ -387,42 +434,59 @@ export default function KelolaTitikAir({
           ))}
         </ul>
 
-        {/* EMPTY STATE */}
         {daftar.length === 0 && (
-          <p className="mt-4 rounded-xl bg-aira-bg p-8 text-center text-sm text-aira-text/60">
+          <p className="mt-4 rounded-[16px] bg-aira-bg p-8 text-center text-base text-aira-text/70">
             Tidak ada titik air yang cocok dengan pencarian.
           </p>
         )}
 
-        {/* JUMLAH DATA */}
-        <p className="mt-4 text-xs text-aira-text/55">
+        <p className="mt-4 text-sm text-aira-text/65">
           {daftar.length} dari {titik.length} titik air aktif
         </p>
       </section>
 
-      {/* =============================== */}
-      {/* PANEL EDIT */}
-      {/* =============================== */}
-
-      {dipilih && (
+      {/* Modal Edit */}
+      {itemEdit && (
         <PanelEditTitikAir
-          key={dipilih.id}
-          titik={dipilih}
-          onClose={tutupPanel}
+          key={`${itemEdit.id}-${kunciForm}`}
+          titik={itemEdit}
+          menyimpan={menyimpanTampil}
+          terkunci={sedangMenyimpan}
+          galatPratinjau={pratinjau === "edit-error"}
+          pratinjauTerkunci={
+            pratinjau === "edit-saving" || pratinjau === "edit-error"
+          }
+          onClose={tutupEdit}
           onSimpan={simpan}
-          sedangMenyimpan={sedangMenyimpan}
         />
       )}
 
-      {/* =============================== */}
-      {/* PANEL TAMBAH */}
-      {/* =============================== */}
-
+      {/* Modal Tambah */}
       {tambahTerbuka && (
         <FormTambahTitikAir
-          onClose={tutupFormTambah}
+          key={`tambah-${kunciForm}`}
+          awal={
+            pratinjau === "add-invalid"
+              ? "invalid"
+              : pratinjau === "add-ok"
+                ? "ok"
+                : ""
+          }
+          onClose={tutupTambah}
         />
       )}
-    </>
+
+      {/* Dialog Hapus */}
+      {itemHapus && (
+        <DeleteDialog
+          nama={itemHapus.name || "Tanpa nama"}
+          memuat={menghapusTampil}
+          terkunci={sedangMenghapus}
+          galat={galatHapus}
+          onBatal={tutupHapus}
+          onKonfirmasi={konfirmasiHapus}
+        />
+      )}
+    </div>
   );
 }
