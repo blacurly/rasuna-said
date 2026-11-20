@@ -122,4 +122,17 @@ Dokumentasi RLS final harus dibuat dari SQL/policy aktual Supabase, bukan meneba
 
 ## Admin Water Point CRUD
 
-Patch menambahkan Route Handlers `app/api/admin/water-points` dan `app/api/admin/water-points/[id]`, dengan service `services/waterPointAdminService.js`. Setiap operasi memverifikasi role admin aktif melalui `requireApiAdmin`. Payload tervalidasi; identitas verifier berasal dari sesi server. DELETE adalah soft-delete dengan `is_active=false` untuk menjaga relasi kontribusi dan riwayat. Public routes `/api/water-navigation` tetap terpisah dan hanya melayani direktori publik sesuai aturan yang sudah ada.
+Patch menambahkan Route Handlers `app/api/admin/water-points` dan `app/api/admin/water-points/[id]`, dengan service `services/waterPointAdminService.js`. Setiap operasi memverifikasi role admin aktif melalui `requireApiAdmin`. Payload tervalidasi; identitas verifier berasal dari sesi server. DELETE adalah hard delete pada `water_points`. Migrasi FK menggunakan `ON DELETE SET NULL` untuk melepas referensi kontribusi tanpa menghapus histori contribution/review. Public routes `/api/water-navigation` tetap terpisah dan hanya melayani direktori publik sesuai aturan yang sudah ada.
+
+
+## Dashboard Admin data source
+
+Ringkasan endpoint `/api/admin/overview` menghitung titik air, titik aktif-terverifikasi-non-simulasi, titik nonaktif, simulasi, jumlah kontribusi dan distribusi status kontribusi dari tabel Supabase. Endpoint ini tetap harus diuji terhadap RLS dan schema aktual pada environment.
+
+## Updated deletion and admin review behavior
+
+- DELETE assessment routes use `delete_my_water_assessment` RPC; ownership is enforced inside the database function and directly dependent recommendation and Assistant interaction rows are removed transactionally.
+- Admin contribution review service passes the final availability choice into the four-argument RPC wrapper. The wrapper delegates the core workflow to the existing three-argument review function.
+- Admin water-point DELETE paths now deactivate (`is_active=false`) instead of physically deleting the row.
+
+See `docs/DB_MIGRATION_GUIDE.md` and `docs/REPAIR_AUDIT_REPORT.md`.

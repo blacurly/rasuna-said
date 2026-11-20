@@ -101,10 +101,19 @@ export async function updateAdminWaterPoint(id, input) {
   if (!data) throw Object.assign(new Error("Titik air tidak ditemukan."), { status: 404, code: "NOT_FOUND" });
   return data;
 }
-export async function deactivateAdminWaterPoint(id) {
+export async function deleteAdminWaterPoint(id) {
   const { supabase } = await adminContext();
-  const { data, error } = await supabase.from("water_points").update({ is_active: false, updated_at: new Date().toISOString() }).eq("water_point_id", id).select("water_point_id, point_name, is_active").maybeSingle();
+  const pointId = Number(id);
+  if (!Number.isSafeInteger(pointId) || pointId <= 0) {
+    throw Object.assign(new Error("ID titik air tidak valid."), { status: 400, code: "INVALID_ID" });
+  }
+  const { data, error } = await supabase
+    .from("water_points")
+    .update({ is_active: false, updated_at: new Date().toISOString() })
+    .eq("water_point_id", pointId)
+    .select("water_point_id, point_name, is_active")
+    .maybeSingle();
   if (error) throw error;
   if (!data) throw Object.assign(new Error("Titik air tidak ditemukan."), { status: 404, code: "NOT_FOUND" });
-  return data;
+  return { ...data, deactivated: true };
 }

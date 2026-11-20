@@ -519,14 +519,13 @@ const spec = {
         },
       },
       delete: {
-        tags: ["Water Assessments"], summary: "Hapus riwayat asesmen", description: `Hanya pemilik asesmen yang dapat menghapusnya. Penghapusan ditolak jika asesmen sudah memiliki rekomendasi atau interaksi Assistant agar relasi historis tidak terputus. ${authDescription}`,
+        tags: ["Water Assessments"], summary: "Hapus riwayat asesmen", description: `Hanya pemilik asesmen yang dapat menghapusnya. Penghapusan menghapus rekomendasi dan interaksi Assistant yang terhubung langsung ke asesmen tersebut secara transaksional; profil rumah tangga tidak dihapus. ${authDescription}`,
         security: [{ SupabaseCookieSession: [] }],
         parameters: [{ in: "path", name: "id", required: true, schema: { type: "integer", minimum: 1 } }],
         responses: {
           "200": response("Riwayat asesmen dihapus.", { success: true, message: "Riwayat asesmen berhasil dihapus.", data: { assessment_id: 1 } }),
           "401": failure("Belum login.", 401, "UNAUTHENTICATED", "Silakan masuk terlebih dahulu."),
           "404": failure("Asesmen tidak ditemukan.", 404, "NOT_FOUND", "Riwayat asesmen tidak ditemukan."),
-          "409": failure("Asesmen memiliki data turunan.", 409, "ASSESSMENT_HAS_DEPENDENCIES", "Riwayat tidak dapat dihapus karena memiliki data terkait."),
         },
       },
     },
@@ -591,7 +590,7 @@ const spec = {
     "/api/admin/water-points/{id}": {
       get: { tags: ["Admin"], summary: "Detail titik air untuk admin", security: [{ SupabaseCookieSession: [] }], parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer" } }], responses: { "200": response("Detail titik air", { success: true, message: "Detail titik air berhasil diambil.", data: {} }), "404": failure("Tidak ditemukan", 404, "NOT_FOUND", "Titik air tidak ditemukan.") } },
       patch: { tags: ["Admin"], summary: "Perbarui data titik air", description: "Memperbarui field yang diizinkan; status reviewer tidak dapat ditentukan sebagai identitas dari client.", security: [{ SupabaseCookieSession: [] }], parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer" } }], requestBody: { required: true, content: { "application/json": { schema: { $ref: "#/components/schemas/AdminWaterPointRequest" } } } }, responses: { "200": response("Data diperbarui", { success: true, message: "Titik air berhasil diperbarui.", data: {} }), "404": failure("Tidak ditemukan", 404, "NOT_FOUND", "Titik air tidak ditemukan."), "422": failure("Validasi gagal", 422, "VALIDATION_ERROR", "Data titik air belum valid.") } },
-      delete: { tags: ["Admin"], summary: "Nonaktifkan titik air (soft delete)", description: "Menetapkan is_active=false; data tidak dihapus permanen untuk menjaga relasi dan riwayat.", security: [{ SupabaseCookieSession: [] }], parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer" } }], responses: { "200": response("Titik air dinonaktifkan", { success: true, message: "Titik air berhasil dinonaktifkan.", data: { water_point_id: 1, is_active: false } }), "404": failure("Tidak ditemukan", 404, "NOT_FOUND", "Titik air tidak ditemukan.") } }
+      delete: { tags: ["Admin"], summary: "Hapus titik air secara permanen (hard delete)", description: "Admin menghapus record water_points secara permanen. Riwayat kontribusi/review terkait harus tetap dipertahankan; dependensi database ditangani tanpa cascade menghapus histori (misalnya water_point_id menjadi NULL jika FK mendukung).", security: [{ SupabaseCookieSession: [] }], parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer" } }], responses: { "200": response("Titik air dinonaktifkan", { success: true, message: "Titik air berhasil dinonaktifkan dari direktori.", data: { water_point_id: 1 } }), "404": failure("Tidak ditemukan", 404, "NOT_FOUND", "Titik air tidak ditemukan.") } }
     },
     "/api/profile": {
       get: {

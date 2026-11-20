@@ -78,3 +78,31 @@ Status awal: Belum diuji end-to-end pada environment Supabase/Vercel milik tim.
 - [ ] DELETE menonaktifkan (`is_active=false`), bukan menghapus permanen.
 - [ ] Titik nonaktif tidak muncul pada daftar publik `/api/water-navigation`.
 - [ ] OpenAPI JSON menampilkan operasi CRUD admin water points.
+
+## Admin repair additions (20 Nov 2026)
+
+- [ ] Anonymous visitor and signed-in user see the same eligible public point list: verified + active + non-simulation.
+- [ ] Simulated point does not appear publicly.
+- [ ] Pending contribution is not published.
+- [ ] Admin can review and approve only after checking evidence/source, coordinates, access, and availability.
+- [ ] Verify approved new-point contribution is linked to its created `water_points` row and the public listing criteria are met.
+- [ ] Verify approved update-point contribution updates the target row and does not create a duplicate.
+- [ ] Admin overview cards and contribution status display database values, not mock values.
+- [ ] Admin overview endpoint denies non-admin users.
+- [ ] Run FK diagnostics and confirm contribution reference FK uses `ON DELETE SET NULL` before testing delete.
+- [ ] Delete a test point in admin UI; confirm the row is absent from `water_points`.
+- [ ] Confirm related contribution records remain and their `water_point_id` becomes NULL; contribution review history remains.
+- [ ] Failed delete request leaves the UI row visible and shows an error.
+- [ ] Do not test hard-delete on production/user-reported points before backup and approval.
+
+
+## Backend repair UAT (added)
+- [ ] Delete assessment with no recommendations or assistant interactions.
+- [ ] Delete assessment with linked recommendations and assistant interactions; verify those rows are removed only for that assessment.
+- [ ] Attempt to delete another user's assessment; function must return not-found/denied and preserve data.
+- [ ] Update assessment notes and refresh; notes persist.
+- [ ] Approve a contribution with each final availability option and verify the point receives the chosen availability.
+- [ ] Reject and request revision; verify review history and contribution status.
+- [ ] Admin water point DELETE deactivates (`is_active=false`) and public list excludes it.
+- [ ] Check Admin cannot use the deactivation endpoint as a normal user.
+- [ ] Run tests, lint, and build after installing dependencies.

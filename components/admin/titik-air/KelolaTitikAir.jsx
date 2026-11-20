@@ -14,7 +14,7 @@ import PanelEditTitikAir, {
 } from "@/components/admin/titik-air/PanelEditTitikAir";
 
 import FormTambahTitikAir from "@/components/admin/titik-air/FormTambahTitikAir";
-import { nonaktifkanTitikAirAction } from "@/app/actions/admin-titik-air";
+import { hapusTitikAirAction } from "@/app/actions/admin-titik-air";
 
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 
@@ -181,18 +181,18 @@ export default function KelolaTitikAir({
 
 
   const hapusTitikAir = async (item) => {
-    const konfirmasi = window.confirm(`Nonaktifkan titik air "${item.name || "Tanpa nama"}"? Titik ini akan dihapus dari daftar aktif, tetapi data tidak dihapus permanen.`);
+    const konfirmasi = window.confirm(`Hapus permanen titik air "${item.name || "Tanpa nama"}" dari database? Riwayat kontribusi/review akan tetap dipertahankan dan relasinya dilepas.`);
     if (!konfirmasi) return;
     setPesan(null);
     setSedangMenghapusId(item.id);
     try {
-      const hasil = await nonaktifkanTitikAirAction(item.id);
-      if (!hasil?.success) throw new Error(hasil?.message || "Titik air gagal dinonaktifkan.");
+      const hasil = await hapusTitikAirAction(item.id);
+      if (!hasil?.success) throw new Error(hasil?.message || "Titik air gagal dihapus.");
       setTitik((items) => items.filter((t) => t.id !== item.id));
       if (editId === item.id) setEditId(null);
-      setPesan({ type: "success", text: hasil.message || "Titik air berhasil dinonaktifkan dan dihapus dari daftar." });
+      setPesan({ type: "success", text: hasil.message || "Titik air berhasil dihapus dari database." });
     } catch (error) {
-      setPesan({ type: "error", text: error?.message || "Gagal menonaktifkan titik air. Daftar tidak diubah." });
+      setPesan({ type: "error", text: error?.message || "Gagal menghapus titik air. Daftar tidak diubah." });
     } finally {
       setSedangMenghapusId(null);
     }
@@ -342,7 +342,7 @@ export default function KelolaTitikAir({
                 <td className={td}>
                   <div className="flex justify-end gap-2">
                     <TombolEdit onClick={() => setEditId(t.id)} />
-                    <button type="button" disabled={sedangMenghapusId === t.id} onClick={() => hapusTitikAir(t)} aria-label={`Nonaktifkan ${t.name}`} title="Nonaktifkan titik air" className="inline-flex min-w-10 items-center justify-center gap-2 rounded-full border border-red-200 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"><Trash2 className="size-4" />{sedangMenghapusId === t.id ? "..." : "Hapus"}</button>
+                    <button type="button" disabled={sedangMenghapusId === t.id} onClick={() => hapusTitikAir(t)} aria-label={`Hapus ${t.name}`} title="Hapus titik air secara permanen" className="inline-flex min-w-10 items-center justify-center gap-2 rounded-full border border-red-200 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"><Trash2 className="size-4" />{sedangMenghapusId === t.id ? "..." : "Hapus"}</button>
                   </div>
                 </td>
               </tr>
@@ -382,7 +382,7 @@ export default function KelolaTitikAir({
               </p>
 
               <TombolEdit onClick={() => setEditId(t.id)} penuh />
-              <button type="button" disabled={sedangMenghapusId === t.id} onClick={() => hapusTitikAir(t)} className="mt-2 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-full border border-red-200 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"><Trash2 className="size-4" />{sedangMenghapusId === t.id ? "Menonaktifkan..." : "Nonaktifkan titik air"}</button>
+              <button type="button" disabled={sedangMenghapusId === t.id} onClick={() => hapusTitikAir(t)} className="mt-2 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-full border border-red-200 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"><Trash2 className="size-4" />{sedangMenghapusId === t.id ? "Menghapus..." : "Hapus titik air"}</button>
             </li>
           ))}
         </ul>
