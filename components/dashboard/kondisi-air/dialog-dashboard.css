@@ -1,0 +1,22 @@
+/* Animasi pop-up Kondisi Air Rumah Tangga (B02): hanya opacity dan translateY kecil,
+   posisi akhir tetap persis di tengah. */
+@keyframes dialog-dashboard-masuk {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.dialog-dashboard-masuk {
+  animation: dialog-dashboard-masuk 180ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dialog-dashboard-masuk {
+    animation: none;
+  }
+}
