@@ -45,6 +45,19 @@ export default function KontribusiClient({ items }) {
     return hasil;
   }
 
+  async function hapus(item) {
+    const yakin = window.confirm(`Batalkan kontribusi "${item.name}"? Tindakan ini hanya tersedia selama kontribusi masih menunggu verifikasi.`);
+    if (!yakin) return;
+    const response = await fetch(`/api/contributions/${item.id}`, { method: "DELETE" });
+    const result = await response.json().catch(() => null);
+    if (!response.ok || !result?.success) {
+      window.alert(result?.message || "Kontribusi belum dapat dibatalkan. Coba muat ulang halaman.");
+      return;
+    }
+    setSent(false);
+    router.refresh();
+  }
+
   return (
     <div className="space-y-6">
       <DashboardPageHead
@@ -80,7 +93,7 @@ export default function KontribusiClient({ items }) {
               Terkirim. Statusnya kini Menunggu Verifikasi dan belum tampil di Navigasi Air sampai admin memverifikasinya.
             </p>
           )}
-          <ContributionList items={items} onEdit={bukaForm} />
+          <ContributionList items={items} onEdit={bukaForm} onDelete={hapus} />
         </section>
       )}
 

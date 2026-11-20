@@ -63,6 +63,7 @@ export default async function KondisiAirRumahTanggaPage() {
 
   const awalProfil = profilKosong
     ? {
+        householdId: keluarga.householdId,
         namaRumahTangga: "",
         wilayahDesa: "",
         anggota: "",

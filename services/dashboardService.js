@@ -70,6 +70,7 @@ function keEntri(a) {
     iso: a.assessed_at,
     sumber: s.sumber ?? "kalkulator",
     catatan: s.catatan ?? "",
+    catatanAsesmen: a.assessment_notes ?? "",
     liter: Number(a.available_water_liters),
     hari: a.estimated_duration_days != null ? Number(a.estimated_duration_days) : null,
     anggota: Number(s.anggota ?? h.member_count ?? 0),
@@ -136,6 +137,7 @@ export const ambilDataDashboard = cache(async () => {
   const nama = h?.household_name;
 
   const keluarga = {
+    householdId: h?.household_id ?? null,
     namaRumahTangga: nama && nama !== "Rumah Tangga Pengguna" ? nama : null,
     wilayahDesa: h?.address_detail || lokasiDariRumah(h) || terbaru?.lokasi || "",
     anggota: h?.member_count ?? terbaru?.anggota ?? null,
@@ -170,6 +172,7 @@ export const ambilDataDashboard = cache(async () => {
       sumberAir: sumberKeKalkulator(e.sumberAir),
       luasAtap: e.luasAtap,
       kapasitasTandonLiter: e.kapasitasTandonLiter,
+      catatanAsesmen: e.catatanAsesmen ?? "",
     }));
 
   return {

@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Trash2 } from "lucide-react";
 import { CheckCircle2 } from "lucide-react";
 
 import { Field, Toggle, inputCls } from "@/components/dashboard/DashboardFormUi";
@@ -10,12 +12,29 @@ import { SUMBER_AIR_PROFIL } from "@/lib/sumberAir";
 // Formulir Profil keluarga. `awal` = nilai awal dari data keluarga (database).
 // `kosong` = belum ada profil tersimpan (User Baru): kolom kosong dengan placeholder.
 export default function ProfilKeluargaForm({ awal, kosong = false }) {
+  const router = useRouter();
   const [mhm, setMhm] = useState(awal.anggotaMhm > 0);
   const [perempuan, setPerempuan] = useState(String(awal.anggotaMhm ?? ""));
   const [sumber, setSumber] = useState(awal.sumberAirUtama ?? "");
   const [tersimpan, setTersimpan] = useState(false);
   const [galat, setGalat] = useState("");
   const [menyimpan, setMenyimpan] = useState(false);
+
+  async function hapusProfil() {
+    if (!awal.householdId) return;
+    const yakin = window.confirm("Hapus profil rumah tangga? Penghapusan hanya dapat dilakukan jika belum ada anggota, riwayat asesmen, atau interaksi Assistant yang terhubung.");
+    if (!yakin) return;
+    setGalat("");
+    setMenyimpan(true);
+    const response = await fetch(`/api/households/${awal.householdId}`, { method: "DELETE" });
+    const result = await response.json().catch(() => null);
+    setMenyimpan(false);
+    if (!response.ok || !result?.success) {
+      setGalat(result?.message || "Profil keluarga belum dapat dihapus.");
+      return;
+    }
+    router.refresh();
+  }
 
   async function simpan(e) {
     e.preventDefault();
@@ -173,6 +192,16 @@ export default function ProfilKeluargaForm({ awal, kosong = false }) {
           <span className="inline-flex items-center gap-2 font-medium text-aira-primary" role="status">
             <CheckCircle2 className="size-5" /> Profil keluarga tersimpan
           </span>
+        )}
+        {awal.householdId && (
+          <button
+            type="button"
+            onClick={hapusProfil}
+            disabled={menyimpan}
+            className="inline-flex min-h-[44px] items-center gap-2 rounded-full border border-aira-danger-text/30 px-5 py-2.5 text-sm font-semibold text-aira-danger-text transition-colors hover:bg-aira-peach/20 disabled:opacity-60"
+          >
+            <Trash2 className="size-4" /> Hapus profil
+          </button>
         )}
         {galat && (
           <span className="text-sm font-medium text-aira-danger-dark" role="alert">
