@@ -245,7 +245,7 @@ export async function getPublicWaterPoints() {
 // USER: Mengirim kontribusi titik air
 // ======================================================
 
-export async function submitWaterPointContribution(input) {
+export async function submitWaterPointContribution(input, contributionId = null) {
   const { supabase, user } = await getAuthenticatedClient();
 
   const validation = validateContributionPayload(input);
@@ -401,6 +401,53 @@ export async function submitWaterPointContribution(input) {
     throw new Error("ID titik air tidak valid.");
   }
 
+  if (contributionId != null) {
+    const id = Number(contributionId);
+    if (!Number.isSafeInteger(id) || id <= 0) {
+      const error = new Error("ID kontribusi tidak valid.");
+      error.status = 400;
+      error.code = "INVALID_ID";
+      throw error;
+    }
+
+    const { data: existing, error: findError } = await supabase
+      .from("water_point_contributions")
+      .select("contribution_id, status")
+      .eq("contribution_id", id)
+      .eq("contributor_user_id", user.id)
+      .maybeSingle();
+    throwIfError(findError);
+    if (!existing) {
+      const error = new Error("Kontribusi tidak ditemukan.");
+      error.status = 404;
+      error.code = "NOT_FOUND";
+      throw error;
+    }
+    if (existing.status !== "needs_revision") {
+      const error = new Error("Kontribusi hanya dapat diperbarui ketika statusnya Perlu Perbaikan.");
+      error.status = 409;
+      error.code = "CONTRIBUTION_NOT_EDITABLE";
+      throw error;
+    }
+
+    const { data, error } = await supabase
+      .from("water_point_contributions")
+      .update({ ...payload, status: "pending", admin_review_note: null, admin_review_guidance: null, updated_at: new Date().toISOString() })
+      .eq("contribution_id", id)
+      .eq("contributor_user_id", user.id)
+      .eq("status", "needs_revision")
+      .select("*")
+      .maybeSingle();
+    throwIfError(error);
+    if (!data) {
+      const conflict = new Error("Kontribusi berubah atau tidak lagi dapat diperbarui. Muat ulang halaman.");
+      conflict.status = 409;
+      conflict.code = "CONTRIBUTION_UPDATE_CONFLICT";
+      throw conflict;
+    }
+    return data;
+  }
+
   const { data, error } = await supabase
     .from("water_point_contributions")
     .insert(payload)
@@ -408,7 +455,6 @@ export async function submitWaterPointContribution(input) {
     .single();
 
   throwIfError(error);
-
   return data;
 }
 
@@ -465,9 +511,12 @@ export async function getMyWaterPointContributions() {
     return {
       ...contribution,
       review: latestReview || null,
+      // Kolom status pada kontribusi adalah status terkini. Review lama tetap
+      // menjadi histori, tetapi tidak boleh menimpa status pending setelah user
+      // memperbaiki dan mengirim ulang kontribusinya.
       status:
-        latestReview?.review_status ||
         contribution.status ||
+        latestReview?.review_status ||
         "pending",
     };
   });

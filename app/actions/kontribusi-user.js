@@ -39,7 +39,8 @@ export async function kirimKontribusiUserAction(form, perbaikiId = null) {
 
     const id = Number(perbaikiId);
     const data = await submitWaterPointContribution(
-      formKePayload(form, rumah, Number.isSafeInteger(id) && id > 0 ? id : null),
+      formKePayload(form, rumah, null),
+      Number.isSafeInteger(id) && id > 0 ? id : null,
     );
 
     revalidatePath("/dashboard/kontribusi");
