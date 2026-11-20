@@ -282,3 +282,15 @@ Kriteria Full CRUD berarti tersedia operasi Create, Read, Update, dan Delete yan
 Semua endpoint di atas memeriksa sesi login dan kepemilikan data di server. Status verifikasi tidak dapat diubah oleh pengguna melalui endpoint kontribusi. Penghapusan yang dapat memutus relasi historis ditolak dengan HTTP 409.
 
 OpenAPI JSON tersedia pada `/api/openapi` dan Swagger UI pada `/api-docs`.
+
+## Admin — CRUD Kelola Titik Air (V3 patch)
+
+Semua endpoint berikut memerlukan sesi login Supabase dan role admin aktif yang diverifikasi server:
+
+- `GET /api/admin/water-points`: daftar titik air; filter `q`, `verificationStatus`, `availabilityStatus`, `isActive`, `limit`, `offset`.
+- `POST /api/admin/water-points`: menambah titik air secara langsung. Backend mengatur `verification_status=verified`, identitas verifier, dan nilai default aktivasi/simulasi.
+- `GET /api/admin/water-points/{id}`: detail titik air.
+- `PATCH /api/admin/water-points/{id}`: memperbarui field yang tervalidasi.
+- `DELETE /api/admin/water-points/{id}`: soft delete/penonaktifan (`is_active=false`); data tidak dihapus permanen.
+
+Sumber air yang didukung: `public_well`, `spring`, `storage_tank`, `emergency_tank`, `hydrant`, `reservoir`, `water_station`, `other`. Status ketersediaan: `available`, `limited`, `unavailable`, `unknown`.

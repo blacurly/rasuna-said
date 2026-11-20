@@ -32,3 +32,49 @@ Status awal: Belum diuji end-to-end pada environment Supabase/Vercel milik tim.
 - Jangan melakukan UAT input admin sebelum kontrak tabel, unique constraint anti-duplikasi, dan audit log dipastikan.
 - Jangan menyatakan RLS lulus hanya karena UI menyembunyikan menu; uji langsung dengan sesi dan query API.
 - Jangan menguji approve/reject pada data produksi tanpa persetujuan tim.
+
+
+## UAT tambahan — CRUD dan integritas relasi
+
+### Rumah tangga
+- [ ] User A dapat membaca dan memperbarui rumah tangganya sendiri.
+- [ ] User A tidak dapat membaca/mengubah/menghapus rumah tangga User B (uji ID langsung).
+- [ ] PATCH menolak nama kosong, jumlah anggota di luar 1–30, kapasitas negatif, dan sumber air di luar pilihan.
+- [ ] DELETE berhasil hanya jika tidak ada `household_members`, `water_assessments`, atau `assistant_interactions` terkait.
+- [ ] DELETE mengembalikan 409 jika masih ada data turunan.
+
+### Riwayat asesmen
+- [ ] User hanya dapat membaca/mengubah/menghapus asesmen miliknya.
+- [ ] PATCH hanya menerima `assessment_notes` maksimal 2.000 karakter.
+- [ ] PATCH tidak mengubah nilai kalkulasi maupun `input_snapshot`.
+- [ ] DELETE mengembalikan 409 jika ada rekomendasi atau interaksi Assistant terkait.
+
+### Kontribusi
+- [ ] User hanya dapat melihat kontribusinya sendiri.
+- [ ] Kontribusi `needs_revision` dapat diperbaiki dan dikirim ulang; ID kontribusi tetap sama dan status kembali ke `pending`.
+- [ ] Kontribusi `pending` tanpa review dapat dibatalkan.
+- [ ] Kontribusi yang telah memiliki review tidak dapat dihapus.
+- [ ] User tidak dapat mengubah status menjadi `approved` atau memublikasikan titik air.
+- [ ] Setelah admin menyetujui kontribusi, titik air publik hanya muncul jika lolos aturan verifikasi dan aktif.
+
+### Swagger
+- [ ] Seluruh route handler terdaftar pada `/api/openapi`.
+- [ ] Request body, path/query parameter, response sukses, response error, dan autentikasi sesuai implementasi.
+- [ ] Endpoint privat diuji setelah login pada origin yang sama dengan Swagger UI.
+
+### Database / RLS (wajib sebelum production)
+- [ ] RLS aktif dan policies diuji untuk user A, user B, dan admin.
+- [ ] User tidak dapat mengubah data milik user lain melalui Supabase client maupun REST API.
+- [ ] Hanya admin aktif yang dapat memproses review dan mengelola titik air.
+
+## Admin — Kelola Titik Air
+- [ ] Admin aktif dapat mengambil daftar titik air dengan pagination.
+- [ ] Filter daftar berdasarkan nama, status verifikasi, ketersediaan, dan status aktif.
+- [ ] Admin aktif dapat menambahkan titik air dengan payload valid.
+- [ ] Payload invalid ditolak dengan status 422.
+- [ ] User non-admin dan sesi tanpa login ditolak (403/401).
+- [ ] Admin dapat mengambil detail titik air berdasarkan ID.
+- [ ] Admin dapat memperbarui field yang diizinkan.
+- [ ] DELETE menonaktifkan (`is_active=false`), bukan menghapus permanen.
+- [ ] Titik nonaktif tidak muncul pada daftar publik `/api/water-navigation`.
+- [ ] OpenAPI JSON menampilkan operasi CRUD admin water points.

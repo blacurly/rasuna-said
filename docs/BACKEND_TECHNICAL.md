@@ -119,3 +119,7 @@ Sebelum UAT di Vercel Preview:
 ## 8. Batas dokumentasi
 
 Dokumentasi RLS final harus dibuat dari SQL/policy aktual Supabase, bukan menebak berdasarkan query aplikasi. Dokumentasi database final membutuhkan schema export tanpa data pengguna dan tanpa secret.
+
+## Admin Water Point CRUD
+
+Patch menambahkan Route Handlers `app/api/admin/water-points` dan `app/api/admin/water-points/[id]`, dengan service `services/waterPointAdminService.js`. Setiap operasi memverifikasi role admin aktif melalui `requireApiAdmin`. Payload tervalidasi; identitas verifier berasal dari sesi server. DELETE adalah soft-delete dengan `is_active=false` untuk menjaga relasi kontribusi dan riwayat. Public routes `/api/water-navigation` tetap terpisah dan hanya melayani direktori publik sesuai aturan yang sudah ada.
