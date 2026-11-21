@@ -56,7 +56,7 @@ export default function Modal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[1000] flex items-end justify-center overflow-hidden bg-aira-primary-dark/60 pt-4 backdrop-blur-sm sm:items-start sm:p-8 lg:p-16"
+      className="fixed inset-0 z-1000 flex items-end justify-center overflow-hidden bg-aira-primary-dark/60 pt-4 backdrop-blur-sm sm:items-start sm:p-8 lg:p-16"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget && !locked) onClose();
       }}
@@ -72,7 +72,7 @@ export default function Modal({
           e.preventDefault();
           onSubmit();
         }}
-        className="flex max-h-full w-full max-w-[672px] flex-col rounded-t-[28px] bg-white shadow-soft outline-none sm:rounded-[28px]"
+        className="flex max-h-full w-full max-w-2xl flex-col rounded-t-[28px] bg-white shadow-soft outline-none sm:rounded-[28px]"
       >
         <div className="flex items-center justify-between gap-4 border-b border-aira-primary/10 px-5 py-4 sm:px-8 sm:py-5">
           <h2 className="font-heading text-2xl font-semibold text-aira-primary">
