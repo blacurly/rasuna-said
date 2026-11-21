@@ -327,7 +327,7 @@ export default function KelolaTitikAir({
                 Wilayah
               </th>
 
-              <th className={`${thTabel} w-[170px]`}>
+              <th className={`${thTabel} w-42.5`}>
                 Ketersediaan
               </th>
 
@@ -335,7 +335,7 @@ export default function KelolaTitikAir({
                 Jam operasional
               </th>
 
-              <th className={`${thTabel} w-[136px] text-right`}>
+              <th className={`${thTabel} w-34 text-right`}>
                 Aksi
               </th>
             </tr>
@@ -347,7 +347,7 @@ export default function KelolaTitikAir({
                 key={t.id}
                 className="border-b border-aira-primary/5 last:border-0 hover:bg-aira-bg"
               >
-                <td className={`${tdTabel} min-h-[88px]`}>
+                <td className={`${tdTabel} min-h-22`}>
                   <p className="font-semibold text-aira-primary wrap-break-word">
                     {t.name || "Tanpa nama"}
                   </p>
@@ -411,7 +411,7 @@ export default function KelolaTitikAir({
           {daftar.map((t) => (
             <li
               key={t.id}
-              className="rounded-[16px] border border-aira-primary/10 p-5"
+              className="rounded-aira border border-aira-primary/10 p-5"
             >
               <p className="font-semibold text-aira-primary wrap-break-word">
                 {t.name || "Tanpa nama"}
@@ -467,7 +467,7 @@ export default function KelolaTitikAir({
 
         {/* EMPTY STATE */}
         {daftar.length === 0 && (
-          <p className="mt-4 rounded-[16px] bg-aira-bg p-8 text-center text-base text-aira-text/70">
+          <p className="mt-4 rounded-aira bg-aira-bg p-8 text-center text-base text-aira-text/70">
             Tidak ada titik air yang cocok dengan pencarian.
           </p>
         )}
